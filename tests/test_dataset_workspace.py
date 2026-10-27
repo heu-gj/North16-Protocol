@@ -138,7 +138,7 @@ class DatasetWorkspaceTests(unittest.TestCase):
                 self.assertTrue((out/'masks/f000000.png').is_file())
                 row=read_table(out/'samples.txt')[0];ids.append(row['id'])
                 self.assertEqual((row['label_status'],row['camera']),('draft',key[2]))
-                self.assertEqual(root/row['mask'],out/'masks/f000000.png')
+                self.assertEqual((root/row['mask']).resolve(), (out/'masks/f000000.png').resolve())
             self.assertNotEqual(*ids)
             project=ws.output_path('projects',key,ws.new_run_id())
             export_editor(out,project)

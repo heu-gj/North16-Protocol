@@ -21,7 +21,7 @@ class PackageTests(unittest.TestCase):
             self.assertEqual(cfg["inputs"][0]["segments"], ["segment_a"])
             self.assertIsNone(cfg["inputs"][0]["verified_timezone"])
             self.assertEqual(cfg["inputs"][0]["recording_date_label"], "unknown")
-            self.assertEqual(cfg["dataset"]["output_root"], (root / "datasets").as_posix())
+            self.assertEqual(Path(cfg["dataset"]["output_root"]).resolve(), (root / "datasets").resolve())
             self.assertTrue((project / "templates/txt/classes.txt").is_file())
             self.assertTrue((project / "docs/PROTOCOL.md").is_file())
             self.assertFalse((root / "datasets").exists())

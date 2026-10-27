@@ -1,3 +1,7 @@
+# Python包0.9.3 — 2026-10-27
+
+修正Windows测试对临时目录8.3短路径与完整路径的字符串比较，改为解析后比较同一位置。用于通过GitHub托管Windows环境验证；运行时算法、数据格式与0.9.2一致。
+
 # Python包0.9.2 — 2026-10-27
 
 整理为North16-Protocol GitHub分发仓库，统一pip install .、可选依赖、VCS和wheel安装说明。补齐源码分发资源清单，增加仓库元数据、操作流程、GitHub Actions测试/构建与版本标签Release发布。协议ID、类别和标签格式不变。

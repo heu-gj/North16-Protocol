@@ -1,6 +1,6 @@
-North16 Protocol 0.9.2 packages the current dataset and annotation workflow for installation from source, GitHub, or a wheel.
+North16 Protocol 0.9.3 packages the current dataset and annotation workflow for installation from source, GitHub, or a wheel.
 
-- Install the GUI: `python -m pip install "north16-0.9.2-py3-none-any.whl[gui]"`.
+- Install the GUI: `python -m pip install "north16-0.9.3-py3-none-any.whl[gui]"`.
 - Source installation: `python -m pip install ".[gui]"`.
 - Launch: `north16 segmentation gui --root <dataset-root>`.
 - Includes structured initialization, camera extraction, two-point horizon editing, 16-camera preview/validation, selected-camera JSON export, checked package import, and Dataset readers.
