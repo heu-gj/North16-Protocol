@@ -1,0 +1,8 @@
+# Loader contract. This is a draft, not a frozen benchmark release.
+schema_version=north16_seg_v1
+protocol_id=north16-seg-v0.1-draft
+protocol_status=draft
+task=semantic_segmentation
+num_classes=4
+ignore_index=255
+protocol_revision=design-v0.7

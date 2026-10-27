@@ -1,0 +1,36 @@
+# Specification only; no builder CLI is implemented.
+schema_version: north16_import_v1
+status: example_not_executable
+dataset:
+  id: north16
+  output_root: E:/Dataset/north16/datasets
+protocol:
+  id: north16-seg-v0.1-draft
+  status: draft
+  spec: ../docs/PROTOCOL.md
+  config: protocol.yaml
+  revision: design-v0.7
+inputs:
+- raw_root_id: north16_260902_raw
+  path: E:/Dataset/north16/260902
+  scope: auto
+  adapter: adapters/north16_capture_v1.yaml
+  source_namespace: north16
+  session_id: north16_20260902_run01
+  recording_date_label: '2026-09-02'
+  verified_timezone: null
+sar_inputs: []
+build:
+  discovery_must_precede_extraction: true
+  stage: inspect
+  resume: true
+  overwrite_assets: false
+  preserve_human_attributes: true
+  preserve_annotations: true
+  estimate_disk_before_extraction: true
+  per_asset_atomic_commit: true
+  unknown_time_policy: keep_unknown
+  missing_sensor_policy: record_and_continue_unaffected_tasks
+  critical_source_conflict_policy: fail_conflicting_asset
+  append_without_resplitting_existing_release: true
+  converter_version: null

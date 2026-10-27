@@ -1,0 +1,65 @@
+name: Tests and distributions
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.10', '3.12']
+    env:
+      QT_QPA_PLATFORM: offscreen
+      PYTHONUTF8: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install FFmpeg
+        run: choco install ffmpeg --yes --no-progress
+      - name: Install CPU PyTorch and application
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install ".[gui]"
+      - name: Run regression tests
+        run: python -m unittest discover -s tests -v
+
+  distributions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build wheel from source distribution
+        run: |
+          python -m pip install --upgrade pip build twine
+          python -m build
+          python -m twine check dist/*
+          python scripts/check_distribution.py
+      - name: Check regular source installation
+        run: |
+          python -m pip install .
+          python -I scripts/check_install.py
+      - name: Check wheel installation
+        run: |
+          python -m pip install --force-reinstall dist/*.whl
+          python -I scripts/check_install.py
+      - name: Check source distribution installation
+        run: |
+          python -m pip install --force-reinstall dist/*.tar.gz
+          python -I scripts/check_install.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: distributions
+          path: dist/

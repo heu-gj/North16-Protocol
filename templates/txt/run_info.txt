@@ -1,0 +1,19 @@
+# Copy to logs/<run_id>/info.txt after filling actual run information.
+schema_version=north16_run_v1
+record_status=template
+run_id=unknown
+run_status=pending
+protocol_id=north16-seg-v0.1-draft
+protocol_revision=design-v0.7
+converter_version=unknown
+reader_version=unknown
+config_path=unknown
+config_sha256=unknown
+source_scope=unknown
+previous_source_registry=unknown
+started_at_utc=unknown
+ended_at_utc=unknown
+discovered_source_count=unknown
+successful_observation_count=unknown
+failed_asset_count=unknown
+blocked_stage_count=unknown

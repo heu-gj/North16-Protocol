@@ -1,0 +1,7 @@
+# Global segmentation label IDs; applicable sensor subsets are specified by task.
+schema_version=north16_classes_v1
+sky=0
+water=1
+ice=2
+other=3
+ignore=255

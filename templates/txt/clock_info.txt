@@ -1,0 +1,16 @@
+# Copy to sync/clocks/<clock_model_id>/info.txt after evidence review.
+schema_version=north16_clock_v1
+record_status=template
+clock_model_id=unknown
+clock_domain=unknown
+reference_clock_domain=unknown
+raw_timezone=unknown
+valid_source_scope=unknown
+model_type=unknown
+model_parameters_path=unknown
+uncertainty_ms=unknown
+evidence_id=unknown
+evidence_path=unknown
+status=unresolved
+reviewer_id=unknown
+reviewed_at_utc=unknown

@@ -1,0 +1,1 @@
+id	sequence	sensor	camera	image	mask	meta	weather	illumination	label_status	group

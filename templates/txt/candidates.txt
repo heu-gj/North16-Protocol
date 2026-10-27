@@ -1,0 +1,1 @@
+id	selection_method	selection_reason	sampling_weight	status

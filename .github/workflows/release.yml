@@ -1,0 +1,49 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    uses: ./.github/workflows/ci.yml
+
+  publish:
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify version tag
+        env:
+          VERSION_TAG: ${{ github.ref_name }}
+        run: |
+          python - <<'PY'
+          import ast, os, pathlib, tomllib
+          version = tomllib.loads(pathlib.Path('pyproject.toml').read_text())['project']['version']
+          tree = ast.parse(pathlib.Path('src/north16/__init__.py').read_text())
+          declared = next(ast.literal_eval(n.value) for n in tree.body if isinstance(n, ast.Assign) and any(isinstance(t, ast.Name) and t.id == '__version__' for t in n.targets))
+          assert declared == version
+          assert os.environ['VERSION_TAG'] == 'v' + version, 'Run against the matching version tag'
+          PY
+      - uses: actions/download-artifact@v4
+        with:
+          name: distributions
+          path: dist/
+      - name: Publish GitHub Release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION_TAG: ${{ github.ref_name }}
+        run: |
+          if ! gh release view "$VERSION_TAG" >/dev/null 2>&1; then
+            gh release create "$VERSION_TAG" --verify-tag --title "North16 $VERSION_TAG" --notes-file docs/RELEASE.md
+          fi
+          gh release upload "$VERSION_TAG" dist/*.whl dist/*.tar.gz dist/SHA256SUMS.txt --clobber

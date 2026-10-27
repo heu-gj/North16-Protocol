@@ -1,0 +1,25 @@
+# Copy as sequences/<sequence>/info.txt after filling verified fields.
+schema_version=north16_sequence_v1
+record_status=template
+session_id=unknown
+segment_id=unknown
+sequence=unknown
+raw_root_id=unknown
+source_relative_path=unknown
+default_scope=none
+weather=unknown
+weather_source=unknown
+weather_evidence_id=unknown
+weather_confidence=unknown
+weather_status=unreviewed
+weather_reason=not_assessed
+illumination=unknown
+illumination_source=unknown
+illumination_evidence_id=unknown
+illumination_confidence=unknown
+illumination_status=unreviewed
+illumination_reason=not_assessed
+attribute_version=unknown
+reviewer_id=unknown
+reviewed_at_utc=unknown
+source_namespace=unknown

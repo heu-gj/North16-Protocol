@@ -1,0 +1,11 @@
+schema_version=north16_sync_v1
+record_status=template
+association_version=unknown
+association_status=not_executed
+pair_delta_convention=associated_minus_reference_ms
+sar_delta_convention=acquisition_midpoint_minus_reference_s
+clock_evidence_version=unknown
+calibration_evidence_version=unknown
+sensor_match_tolerance_ms=unknown
+maximum_time_uncertainty_ms=unknown
+spatial_acceptance_rule=unknown

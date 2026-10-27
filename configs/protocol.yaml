@@ -1,0 +1,415 @@
+# Draft protocol. Implemented pilot scope is documented in docs/EXECUTION.md.
+status: draft
+modules:
+  workflow_version: modular_v1
+  initialization: inventory_and_empty_camera_directories_only
+  camera: separate_explicit_extraction
+  segmentation:
+    label_pattern: sequences/{sequence}/{sensor}/{camera}/masks/{frame_stem}.json
+    default_format: json
+    default_label_status: draft
+  package_payload: dataset
+  index_for_new_datasets: per_stream_frames
+  empty_masks_on_initialization_or_extraction: false
+name: North16
+design_version: design-v0.7
+build_spec: ../docs/BUILD.md
+import_config_example: import.example.yaml
+source_adapter: adapters/north16_capture_v1.yaml
+time:
+  canonical_scale: UTC
+  raw_log_format: '%Y_%m_%d_%H_%M_%S'
+  raw_timezone: null
+  frame_log_mapping: unresolved
+  capture_time_fallback: null
+  unknown_capture_time_policy: keep_unresolved_and_exclude_from_verified_fusion
+  preserve_raw_fields: true
+  clock_model: piecewise_affine_with_evidence
+  require_clock_validation: true
+  duplicate_timestamp_policy: preserve_distinct_observation_ids
+  sensor_match_tolerance_ms: null
+  radar_max_age_ms: null
+  allow_synthetic_frames: false
+extraction:
+  frame_selection: all_decodable_source_frames
+  output_camera_format: png
+  preserve_source_dimensions: true
+  preserve_pts_and_time_base: true
+  source_frame_mapping: verify_before_assigning_log_time
+  missing_frame_policy: record_and_quarantine_unresolved_mapping
+  infrared_representation: decoded_video_intensity_not_radiometric_temperature
+  color_conversion_spec: null
+  ffmpeg_build: null
+  overwrite: false
+  atomic_commit: true
+  checksum: sha256
+  enhancement: none
+  preserve_original_geotiff: true
+  memory_and_disk_estimate_required: true
+radar:
+  observation_unit: independent_scan
+  exact_deduplication: sha256_then_verify_geospatial_metadata
+  near_duplicate_review: true
+  preserve_reception_records_for_reused_scans: true
+  scan_acquisition_semantics: null
+  kml_encoding_repair_rule: null
+  navigation_log_field_semantics: null
+  geometry_calibration_id: null
+sar:
+  role: asynchronous_context_or_independent_task
+  product_ids: []
+  acquisition_times: from_verified_product_metadata
+  availability_time_required_for_causal: true
+  spatial_overlap_required: true
+  max_absolute_time_delta_s: null
+  preprocessing_profile: null
+  drift_handling: null
+  split_by_product_and_overlapping_footprints: true
+  same_day_does_not_imply_synchronization: true
+annotation:
+  version: null
+  semantic_task: sky_water_ice_other
+  mask_format: json_shapes
+  legacy_mask_format: uint8_png
+  labels:
+    sky: 0
+    water: 1
+    ice: 2
+    other: 3
+    ignore: 255
+  other_examples:
+  - land
+  - own_ship
+  - other_ship
+  - visible_equipment
+  ignore_reasons:
+  - invalid_sensor
+  - uncertain_boundary
+  - unidentifiable_surface
+  weather_annotation_required: true
+  illumination_annotation_required: true
+  detection_classes:
+  - ship
+  detection_format: coco_bbox_xywh_with_separate_ignore_regions
+  detection_bbox: visible_extent
+  evidence_regimes:
+  - native_only
+  - multi_evidence
+  label_statuses:
+  - unlabeled
+  - draft
+  - reviewed
+  - adjudicated
+  - frozen
+  verified_negative_requires_review: true
+  pilot_observation_budget:
+    total_min: 30
+    total_max: 60
+    sensors:
+    - visible
+    - infrared
+    scope: first_three_camera_segments_only
+    other_campaigns: set_in_import_config
+  independent_double_annotation_fraction:
+    pilot: 1.0
+    train_val: 0.1
+    test: 0.2
+  test_review_fraction: 1.0
+  quality_acceptance_thresholds: null
+metadata_storage:
+  status: explicit_camera_pilot_builder_and_reader_implemented
+  layout_spec: ../docs/METADATA.md
+  encoding: utf-8
+  newline: LF
+  sidecar_format: key_value_split_first_equals
+  output_layout: simple_sequences
+  sequence_pattern: sequences/{sequence_id}
+  stream_pattern: '{sensor}/{camera}'
+  segment_defaults_filename: info.txt
+  stream_metadata_filename: info.txt
+  frame_metadata_pattern: meta/{frame_stem}.txt
+  camera_image_pattern: images/{frame_stem}.png
+  local_mask_pattern: masks/{frame_stem}.json
+  global_classes_filename: classes.txt
+  table_format: tsv_with_header
+  working_index_pattern: samples.txt
+  index_pattern: samples.txt
+  split_pattern: splits/{split}.txt
+  split_format: one_observation_id_per_line
+  unknown_value: unknown
+  inheritance_control_value: inherit
+  frame_override_precedence: true
+  require_default_scope_for_inheritance: true
+  authoritative_attributes: sequence_info_and_frame_txt
+  index_policy: generated_resolved_snapshot_do_not_edit
+  preserve_binary_masks: true
+  preserve_coco_detection_json: true
+  stage_states:
+  - pending
+  - running
+  - succeeded
+  - failed
+  - blocked
+  - skipped
+  time_mapping_states:
+  - unresolved
+  - verified
+  - rejected
+  spatial_states:
+  - unverified
+  - registered
+  - rejected
+  - not_applicable
+  scene_mapping: splits/scenes.txt
+scene_attributes:
+  granularity: continuous_condition_segment_with_frame_overrides
+  bind_to: sequence_info_and_frame_txt_with_event_evidence_reference
+  weather:
+    values:
+    - clear
+    - cloudy_overcast
+    - fog_precipitation
+    - unknown
+    mixed_condition_priority: fog_precipitation
+    evidence: verified_weather_record_or_visible_observation
+    nighttime_without_reliable_evidence: unknown
+  illumination:
+    values:
+    - day
+    - night
+    - unknown
+    preferred_evidence: solar_elevation_from_verified_utc_and_position
+    solar_elevation_convention: geometric_sun_center_degrees
+    day_min_solar_elevation_deg: 0
+    night_below_solar_elevation_deg: -6
+    transition_policy: unknown_with_reason_twilight
+    fallback: documented_manual_review_or_unknown
+    use_fixed_local_clock_hours: false
+    infer_from_infrared_brightness: false
+  record_evidence_and_confidence: true
+  primary_evaluation_groups: separate_weather_and_illumination
+  cross_groups: supplementary_when_independent_scene_count_is_sufficient
+sampling:
+  annotation_candidate_interval_s: 10
+  interval_status: pilot_starting_point
+  group_before_final_selection: true
+  preserve_difficult_valid_samples: true
+  test_model_score_based_selection: false
+  active_learning_pool: train_only_after_split_freeze
+  deduplicate_independent_radar_scans: true
+splits:
+  version: null
+  status: not_generated
+  unit: connected_scene_source_groups
+  preferred_holdout: voyage_then_date_then_spatial_segment
+  target_group_ratios:
+    train: 0.7
+    val: 0.15
+    test: 0.15
+  ratios_are_secondary_to_independence: true
+  group_relations:
+  - shared_physical_scene_across_sensors
+  - adjacent_correlated_segments
+  - identical_or_confirmed_near_duplicate_observations
+  - shared_source_frame_and_all_derivatives
+  - reused_independent_radar_scan
+  - shared_ship_encounter
+  - shared_sar_product_or_overlapping_source_footprint
+  time_guard_s: null
+  spatial_guard_m: null
+  random_frame_split: false
+  cross_task_protected_test_source_groups: true
+  unlabeled_training_pool: train_groups_only
+  test_gold_public: false
+evaluation:
+  evaluator_version: null
+  seeds:
+  - 17
+  - 42
+  - 2026
+  segmentation:
+    primary: scene_macro_miou
+    classes:
+    - 0
+    - 1
+    - 2
+    - 3
+    classes_by_task:
+      SEG-VIS:
+      - 0
+      - 1
+      - 2
+      - 3
+      SEG-IR:
+      - 0
+      - 1
+      - 2
+      - 3
+      SEG-ICE-RADAR:
+      - 1
+      - 2
+      - 3
+      SAR-SEG:
+      - 1
+      - 2
+      - 3
+    ignore_index: 255
+    class_union_zero: exclude_from_scene_mean_and_report
+    all_ignore_scene: invalid_frozen_test_manifest
+    secondary:
+    - global_miou
+    - per_class_iou
+    - ice_iou
+    - ice_dice
+    - water_ice_miou
+    - boundary_f1
+    - valid_pixel_coverage
+    water_ice_miou: average_water_and_ice_iou_from_full_multiclass_confusion_matrix
+    boundary_tolerance_fraction_of_diagonal: 0.002
+    boundary_tolerance_rounding: ceil
+    exclude_ignore_boundary_band: true
+    ice_dice_aggregation: global_confusion_matrix_primary_scene_macro_secondary
+    scene_mapping: splits/scenes.txt
+    class_union_zero_global: exclude_from_global_mean_and_report
+    report_scale: percent_0_to_100
+    scene_id_must_not_default_to_sequence: true
+  detection:
+    primary: coco_style_bbox_ap
+    iou_thresholds:
+    - 0.5
+    - 0.55
+    - 0.6
+    - 0.65
+    - 0.7
+    - 0.75
+    - 0.8
+    - 0.85
+    - 0.9
+    - 0.95
+    recall_thresholds_count: 101
+    max_dets:
+    - 1
+    - 10
+    - 100
+    ignore_region_prediction_overlap_threshold: 0.5
+    ignore_regions_applied_after_normal_gt_matching: true
+    area_coordinates: native_source_grid
+    score_scale: 100
+    no_gt_group_ap: not_applicable_report_false_positives
+    pycocotools_version: null
+  uncertainty_unit: independent_scene_date_encounter_or_sar_product_group
+  malformed_or_missing_predictions: invalid_submission
+  normalize_using_train_only: true
+  tune_using_validation_only: true
+tasks:
+  SEG-VIS:
+    status: proposed
+    target: visible
+    inputs:
+    - visible
+  SEG-IR:
+    status: proposed
+    target: infrared
+    inputs:
+    - infrared
+  SEG-ICE-RADAR:
+    status: requires_expert_feasibility
+    target: ice_radar
+    inputs:
+    - ice_radar
+  DET-VIS:
+    status: requires_ship_event_inventory
+    target: visible
+    inputs:
+    - visible
+  DET-IR:
+    status: requires_ship_event_inventory
+    target: infrared
+    inputs:
+    - infrared
+  DET-RADAR:
+    status: requires_actual_radar_imagery
+    target: null
+    inputs: []
+  FUSION-SEG:
+    status: requires_time_and_spatial_validation
+    target: null
+    inputs: []
+  FUSION-DET:
+    status: requires_time_and_spatial_validation
+    target: null
+    inputs: []
+  SAR-SEG:
+    status: requires_products_and_independent_labels
+    target: sar
+    inputs:
+    - sar
+  SAR-DET:
+    status: requires_products_and_independent_labels
+    target: sar
+    inputs:
+    - sar
+  ASYNC-SAR-CONTEXT:
+    status: requires_multiple_independent_products
+    target: null
+    inputs: []
+    temporal_setting: null
+dataset_reader:
+  class: north16.datasets.North16SegDataset
+  task_name: North16-Seg
+  protocol_id: north16-seg-v0.1-draft
+  schema_version: north16_seg_v1
+  supported_sensors:
+  - visible
+  - infrared
+  input_channels_default: 3
+  image_range:
+  - 0
+  - 1
+  image_dtype: float32
+  mask_dtype: int64
+  default_label_statuses:
+  - reviewed
+  - adjudicated
+  - frozen
+  hidden_test: require_mask_false
+  joint_resize: north16.datasets.SegResize
+  source_builder_implemented: true
+  implementation_status: camera_reader_and_unsplit_inspection_implemented
+  prototype_class: north16_benchmark.dataset.North16SegDataset
+  pilot_sequence_selection: split_none_with_explicit_sequences_require_mask_false
+  infrared_channels_parameter: infrared_channels
+  source_builder_scope: single_root_explicit_segments_camera_auxiliary_preservation_only
+  generic_builder_implemented: false
+annotation_workspace:
+  status: legacy_compatibility
+  layout_version: annotation_workspace_v1
+  drafts: annotations/drafts/{sequence}/{sensor}/{camera}/{run}
+  projects: annotations/projects/{sequence}/{sensor}/{camera}/{run}
+  profiles: annotations/profiles/{sequence}/{sensor}/{camera}/{run}
+  corrected: annotations/corrected/{sequence}/{sensor}/{camera}/{run}
+  archive: annotations/archive
+  inventory: annotations/index.txt
+  generated_label_status: draft
+  generated_review_status: unreviewed
+  filename: original_frame_stem
+release:
+  version: null
+  frozen: false
+  data_license: null
+  code_license: null
+  required_artifacts:
+  - source_and_observation_manifests
+  - clock_and_calibration_evidence
+  - source_group_split_and_exclusion_manifests
+  - annotation_guide_and_review_provenance
+  - dataset_card_and_source_licenses
+  - official_evaluator_and_pinned_environment
+  - baseline_configs_weights_and_real_logs
+  - checksums_build_info_and_changelog
+protocol_id: north16-seg-v0.1-draft
+schema_version: north16_protocol_config_v1
+dataset_spec: ../docs/DATASET.md
+metadata_spec: ../docs/METADATA.md
+task_spec: ../docs/TASKS.md
+pilot_config: pilot.yaml

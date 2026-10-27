@@ -1,0 +1,55 @@
+# Adapter specification, not an implemented plugin.
+adapter_id: north16_capture_v1
+schema_version: north16_adapter_v1
+status: specification_only
+discovery:
+  accepted_input_scopes: [segment, collection, explicit_multi_input, explicit_segments]
+  inspect_input_root_itself: true
+  recursive_segment_name_pattern: '*_data'
+  signature_any: ['camera', 'ice_radar/ice_radar_index.txt', 'navigation_radar/navigation_radar.txt']
+  deduplicate_resolved_directory_candidates: true
+  ignore_output_root: true
+  reject_unknown_layout: true
+segments:
+  key_from: registered_source_relative_segment_path
+  recording_date_hint: directory_name_unverified
+  folder_timestamp_is_capture_time: false
+camera:
+  video_glob: 'camera/*/lens_*.mp4'
+  sensor_name_mappings:
+    front_visible: {modality: visible, position: front}
+    back_visible: {modality: visible, position: back}
+    front_infrared: {modality: infrared, position: front}
+    back_infrared: {modality: infrared, position: back}
+  lens_id_from: video_stem
+  camera_name_pattern: '{position}_{lens_index_2digits}'
+  stream_path_pattern: '{modality}/{camera_name}'
+  expected_stream_count: null
+  expected_frame_count: null
+  fps: probe_each_source
+  dimensions: probe_each_source
+  unknown_sensor_policy: register_unrecognized_without_guessing
+timestamps:
+  log_path: time.txt
+  log_format: '%Y_%m_%d_%H_%M_%S'
+  timezone: null
+  frame_log_mapping: requires_capture_implementation_evidence
+  duplicate_policy: preserve_source_identity
+ice_radar:
+  index_path: ice_radar/ice_radar_index.txt
+  index_format: csv_with_header
+  index_columns: [TIME, STATUS, ICE_RADAR_FILE]
+  image_glob: 'ice_radar/*.tif'
+  metadata_glob: 'ice_radar/*.kml'
+  filename_suffix_is_verified_capture_time: false
+  independent_scan_identity: requires_hash_metadata_and_acquisition_semantics
+navigation:
+  text_path: navigation_radar/navigation_radar.txt
+  record_prefixes: ['TIME:', 'OSD:', 'GGA:']
+  field_semantics: unresolved_exporter_specific
+  route_text_to: nav
+navigation_radar:
+  actual_image_glob: null
+  absence_policy: not_provided
+sar:
+  intake: separate_product_adapter_required

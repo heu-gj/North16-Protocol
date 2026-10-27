@@ -1,0 +1,1 @@
+"""Protocol-driven build orchestration."""

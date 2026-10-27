@@ -1,0 +1,13 @@
+include README.md
+include cli.py
+recursive-include configs *.yaml
+recursive-include templates *.txt
+recursive-include docs *.md
+recursive-include docs *.png
+recursive-include docs *.jpg
+recursive-include tests *.py
+recursive-include scripts *.py
+include run_gui.py launch_gui.ps1 launch_gui.cmd
+include launch_registration.ps1 launch_registration.cmd
+include run.py run_grabcut_first.ps1 import_xanylabeling.ps1 open_xanylabeling.ps1
+global-exclude __pycache__ *.py[cod]

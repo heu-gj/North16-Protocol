@@ -1,0 +1,23 @@
+# Copy as sequences/<sequence>/visible_or_infrared/<camera>/info.txt.
+schema_version=north16_camera_v1
+record_status=template
+session_id=unknown
+segment_id=unknown
+sequence=unknown
+camera=unknown
+sensor_id=unknown
+sensor=unknown
+position=unknown
+lens_id=unknown
+source_id=unknown
+raw_root_id=unknown
+source_video_path=unknown
+codec=unknown
+pixel_format=unknown
+width=unknown
+height=unknown
+time_base=unknown
+declared_frame_count=unknown
+decoded_frame_count=unknown
+decode_status=not_inspected
+conversion_version=unknown

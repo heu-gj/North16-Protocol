@@ -1,0 +1,1 @@
+reference_id	associated_id	relation	delta_t_ms	uncertainty_ms	time_status	spatial_status	clock_model_id	calibration_id	evidence_id	association_version	status

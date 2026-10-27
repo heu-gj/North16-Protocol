@@ -1,0 +1,16 @@
+# Copy to sync/calibrations/<calibration_id>/info.txt after evidence review.
+schema_version=north16_calibration_v1
+record_status=template
+calibration_id=unknown
+reference_sensor=unknown
+associated_sensor=unknown
+valid_source_scope=unknown
+transform_path=unknown
+overlap_definition=unknown
+error_metric=unknown
+measured_error=unknown
+acceptance_threshold=unknown
+evidence_path=unknown
+status=unverified
+reviewer_id=unknown
+reviewed_at_utc=unknown

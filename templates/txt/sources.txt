@@ -1,0 +1,1 @@
+source_id	raw_root_id	source_namespace	session_id	source_relative_path	sha256	size_bytes	sequence	sensor	camera	state	reason

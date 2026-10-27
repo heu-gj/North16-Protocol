@@ -1,0 +1,1 @@
+reference_id	product_id	acquisition_start_utc	acquisition_end_utc	delta_t_s	age_s	availability_time_utc	footprint_overlap	temporal_setting	clock_model_id	evidence_id	association_version	status

@@ -1,0 +1,16 @@
+# Dataset registry identity; unknown values must be populated before release.
+schema_version=north16_dataset_v1
+record_status=template
+dataset_id=unknown
+layout_version=north16_simple_v1
+protocol_id=north16-seg-v0.1-draft
+protocol_status=draft
+dataset_status=working
+label_version=unknown
+split_version=unknown
+protocol_revision=design-v0.7
+dataset_version=unknown
+association_version=unknown
+converter_version=unknown
+reader_version=unknown
+evaluator_version=unknown

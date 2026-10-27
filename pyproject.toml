@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "north16"
+version = "0.9.2"
+description = "North16 protocol-driven dataset tools"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["PyYAML>=6", "Pillow>=9.1", "numpy>=1.24"]
+keywords = ["sea-ice", "segmentation", "dataset", "annotation", "protocol"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Image Processing",
+]
+
+[project.urls]
+Homepage = "https://github.com/heu-gj/North16-Protocol"
+Repository = "https://github.com/heu-gj/North16-Protocol"
+Issues = "https://github.com/heu-gj/North16-Protocol/issues"
+
+[project.optional-dependencies]
+detection = ["ultralytics>=8.3,<9"]
+training = ["torch>=2.0"]
+annotation = ["opencv-python>=4.8"]
+gui = ["PySide6>=6.7,<7", "opencv-python>=4.8"]
+all = ["torch>=2.0", "opencv-python>=4.8", "PySide6>=6.7,<7"]
+dev = ["build>=1.2", "twine>=5"]
+
+[project.scripts]
+north16 = "north16.cli:main"
+north16-build = "north16.pipeline.build:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["north16*"]

@@ -1,0 +1,67 @@
+# Tested explicit-segment camera build recipe; human stages remain pending.
+schema_version: north16_import_v1
+status: executable_camera_pilot
+dataset:
+  id: north16
+  output_root: E:/Dataset/north16/datasets
+protocol:
+  id: north16-seg-v0.1-draft
+  revision: design-v0.7
+  spec: ../docs/PROTOCOL.md
+  config: protocol.yaml
+inputs:
+- raw_root_id: north16_260902_raw
+  path: E:/Dataset/north16/260902
+  scope: explicit_segments
+  adapter: adapters/north16_capture_v1.yaml
+  source_namespace: north16
+  session_id: north16_20260902_run01
+  recording_date_label: '2026-09-02'
+  verified_timezone: null
+  segments:
+  - 2026_09_02_04_42_32_data
+  - 2026_09_02_04_47_32_data
+  - 2026_09_02_04_52_32_data
+sar_inputs: []
+build:
+  planned_stages:
+  - inspect
+  - extract
+  - index
+  - associate
+  - sample
+  - annotate
+  - validate
+  resume: true
+  overwrite_assets: false
+  preserve_human_attributes: true
+  preserve_annotations: true
+  estimate_disk_before_extraction: true
+  per_asset_atomic_commit: true
+  unknown_time_policy: keep_unknown
+  missing_sensor_policy: record_and_continue_unaffected_tasks
+  critical_source_conflict_policy: fail_conflicting_asset
+  decoder_color_conversion: null
+  ffmpeg_build: null
+  preflight_required: true
+pilot:
+  enabled_tasks:
+  - SEG-VIS
+  - SEG-IR
+  required_sensors:
+  - visible
+  - infrared
+  source_selection: exact_registered_first_three_segments
+  fail_on_missing_selected_segment: true
+  frame_selection: all_decodable_source_frames
+  auxiliary_sensors: inventory_preserve_and_audit
+  annotation_budget_total:
+    min: 30
+    max: 60
+  annotation_balance: approximately_equal_visible_infrared
+  annotation_selection: coverage_then_remove_near_duplicates
+  independent_double_annotation_fraction: 1.0
+  generate_splits: false
+  run_training: false
+  run_official_evaluation: false
+  freeze_release: false
