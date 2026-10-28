@@ -26,9 +26,12 @@ python cli.py initialize --raw E:\Dataset\north16\260902 --output E:\Dataset\nor
 
 ```powershell
 python cli.py camera extract --root E:\Dataset\north16\datasets_new
+python cli.py camera extract --root E:\Dataset\north16\datasets_new --interval 5
 python cli.py camera extract --root E:\Dataset\north16\datasets_new --sensor visible --cameras back_04
 python cli.py camera export --root E:\Dataset\north16\datasets_new --output E:\Dataset\north16\camera_export
 ```
+
+全量和间隔抽帧二选一。`--interval` 单位秒、必须有限且大于0，可用0.5等小数；默认省略保存所有实际帧。按源PTS从首帧起选择，每次保留第一个与上次保留帧相差至少指定秒数的实际帧。不插帧、不保证各设备同步。图片名称和样本ID保留源解码帧序号（可能不连续）；meta记录原PTS/time_base、decoded_frame_index和saved_frame_index，info记录间隔与总解码/保存帧数。更改已有流的间隔会拒绝覆盖，应使用新初始化目录。历史build入口仍按原配置全量抽帧。
 
 ## 分割标注与JSON导出
 

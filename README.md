@@ -1,6 +1,6 @@
 # North16 Protocol
 
-海冰数据集的结构化管理、相机抽帧、可见光预标注和 Dataset 读取工具。Python 包名、导入名和命令均为 **`north16`**，当前版本 **0.9.3**，要求 **Python 3.10+**。
+海冰数据集的结构化管理、相机抽帧、可见光预标注和 Dataset 读取工具。Python 包名、导入名和命令均为 **`north16`**，当前版本 **0.10.0**，要求 **Python 3.10+**。
 
 原始视频 → 初始化结构化目录 → 相机抽帧 → 调参预览 → 首/中/末检查 → 导出 JSON 标签包 → 合并数据集 → 人工修正与审核。
 
@@ -29,10 +29,10 @@ python -m pip install .
 python -m pip install -e ".[gui]"
 
 # 从 GitHub 固定版本安装，无需手动克隆
-python -m pip install "north16[gui] @ git+https://github.com/heu-gj/North16-Protocol.git@v0.9.3"
+python -m pip install "north16[gui] @ git+https://github.com/heu-gj/North16-Protocol.git@v0.10.0"
 
 # 从 GitHub Releases 下载 wheel 后安装
-python -m pip install ".\north16-0.9.3-py3-none-any.whl[gui]"
+python -m pip install ".\north16-0.10.0-py3-none-any.whl[gui]"
 ```
 
 安装 wheel 后可在任意目录使用 `north16` 或 `python -m north16`，无需复制 `src/` 或配置 `PYTHONPATH`。从源码目录运行时也支持 `python cli.py ...`。这些安装方式不依赖 PyPI 发布。
@@ -60,6 +60,9 @@ north16 initialize --raw E:\data\raw --output E:\data\datasets
 # 2. 相机模块抽帧，保留原尺寸、逐帧 PTS 和来源信息
 north16 camera extract --root E:\data\datasets
 
+# 可选：每隔至少5秒保留一个实际帧；与上面的全量方式二选一
+north16 camera extract --root E:\data\datasets --interval 5
+
 # 3. 在界面中选择片段、visible 镜头并调参
 north16 segmentation gui --root E:\data\datasets
 ```
@@ -74,6 +77,8 @@ north16 segmentation gui --root E:\data\datasets
 6. 点击“打开最近输出目录”查看标签包。默认位于数据集相邻的 `labels/<批次>/`；也可选择输出位置。其他片段分别检查、导出。
 
 现有自动目录发现适配 North16 采集布局；其他原始布局需要增加适配器。当前 GrabCut 预标注仅适配 **visible**，**infrared** 支持抽帧、浏览与像素查看。各设备时间戳登记不代表完成同步认证。
+
+`--interval` 单位为秒，接受正小数；省略则保存全部可解码帧。按源PTS从首帧开始，相邻保留帧至少间隔指定秒数，实际间隔取决于视频中可用帧；不生成补帧。文件名保留源解码帧号，如 `f000000.png`、`f000005.png`；元信息保留PTS、time_base、源帧号和保存序号。各路独立取样，不代表时间对齐。对已有完整流更改间隔会报冲突，请初始化另一个数据集目录。
 
 ## 数据目录和导出包
 
@@ -141,7 +146,7 @@ python -m build
 python -m twine check dist/*
 ```
 
-产物为 `dist/north16-0.9.3-py3-none-any.whl` 和 `dist/north16-0.9.3.tar.gz`，包含 Python 模块、协议配置、TXT 模板和文档。原始视频、数据集、运行标签、虚拟环境和备份不打入包。
+产物为 `dist/north16-0.10.0-py3-none-any.whl` 和 `dist/north16-0.10.0.tar.gz`，包含 Python 模块、协议配置、TXT 模板和文档。原始视频、数据集、运行标签、虚拟环境和备份不打入包。
 
 ```powershell
 python -m pip install ".[all]"

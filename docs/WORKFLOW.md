@@ -4,7 +4,7 @@
 
 1. 安装 `north16[gui]`，并安装 FFmpeg / FFprobe。运行 `north16 doctor` 检查环境。
 2. `north16 initialize --raw <原始根目录> --output <新数据集目录>`：登记来源、建立片段 / visible / infrared / 镜头位置，不转图片、不创建 masks。当前适配器识别 North16 采集布局，其他布局需适配。
-3. `north16 camera extract --root <数据集目录>`：逐视频解码为 images/*.png，生成 meta/*.txt、frames.txt 与流信息。可用 `--sensor visible --cameras back_04` 缩小范围；使用 `--sequences` 选择片段。
+3. `north16 camera extract --root <数据集目录>`：逐视频解码为 images/*.png，生成 meta/*.txt、frames.txt 与流信息。加 `--interval 5` 每隔至少5秒保存一个实际帧，省略则全量；源帧号和PTS保留，文件名可不连续。可用 `--sensor visible --cameras back_04` 缩小范围；使用 `--sequences` 选择片段。不同间隔请使用不同的新数据集目录，不覆盖已有流。
 4. `north16 segmentation gui --root <数据集目录>`：选择片段和 visible，进入16路总览，逐镜头调试。
 5. 两点直线地平线：拖动左右端点调整高度和倾斜。忽略半宽默认1.00%。有明显曲线畸变时用多点折线。人工选择冰水混合 / 全冰 / 全水；保留地平线后估计亮度阈值并修调。各路参数独立。
 6. 点击“验证16路：开头 / 中间 / 末尾”，查看4×4总览或逐镜头三帧并排。检查地平线、冰水边界、暗冰、反光、船体等；该检查不写标签，也不代表准确率。

@@ -39,10 +39,13 @@ datasets_new/
 
 ```powershell
 north16 camera extract --root E:\Dataset\north16\datasets_new
+north16 camera extract --root E:\Dataset\north16\datasets_new --interval 5
 north16 camera extract --root E:\Dataset\north16\datasets_new --sensor visible --cameras back_04
 ```
 
-可另指定`--sequences`、`--ffmpeg`、`--ffprobe`。只处理选中的已登记相机视频，保留原生尺寸、所有实际可解码帧、实际PTS和time_base，不插帧、不增强，不推定认证UTC。原始数据校验、磁盘预算和流身份检查通过后才解码。每流先在临时目录完成，保留初始化占位信息后提交；完整流支持校验后复用，中断产生的partial目录保留用于诊断。
+可另指定`--sequences`、`--ffmpeg`、`--ffprobe`。默认保留所有实际可解码帧；也可用`--interval <秒>`按源PTS稀疏抽帧，保留首帧，随后每次选与上一保留帧相差至少指定秒数的第一个实际帧。支持正小数，不插帧、不增强、不推定认证UTC。保留原生尺寸、源解码帧号、PTS和time_base，稀疏文件名可不连续。源视频仍需解码，主要节省PNG存储和后续标注成本。原始数据校验、磁盘预算和流身份检查通过后才解码。每流先在临时目录完成，保留初始化占位信息后提交；完整流支持相同参数校验后复用，更改间隔会报冲突，中断产生的partial目录保留用于诊断。
+
+稀疏流info记录frame_selection=minimum_pts_interval、sampling_interval_s、source_decoded_frame_count和saved_frame_count；兼容字段decoded_frame_count仍代表保存观测数。meta的decoded_frame_index为源解码帧号，新增saved_frame_index为本次保存序号。原始PTS缺失或倒退时拒绝提交稀疏流。相机包、分割JSON、GUI和Dataset按frames索引读取稀疏图像；不依赖连续文件名。各镜头独立选择，不能据此认证同步。历史build入口全量行为不变。
 
 ```text
 visible/back_04/

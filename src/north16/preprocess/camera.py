@@ -8,6 +8,7 @@ import re
 import shutil
 import subprocess
 import uuid
+from fractions import Fraction
 
 from PIL import Image
 
@@ -40,20 +41,51 @@ def verify_stream(folder: Path, *, key: str, source_id: str, deep: bool = True) 
     if len(rows) != int(info["decoded_frame_count"]) or not rows:
         raise ValueError(f"Frame count mismatch: {folder}")
     images = set((folder / "images").glob("*.png"))
-    if images != {folder / "images" / f"f{i:06d}.png" for i in range(len(rows))}:
+    if images != {folder / "images" / Path(row["image"]).name for row in rows} or len(images) != len(rows):
         raise ValueError(f"Image set mismatch: {folder}")
+    previous = -1
+    sampled = info.get("frame_selection") == "minimum_pts_interval"
+    if sampled:
+        from north16.camera.sampling import normalize_interval
+        interval = normalize_interval(info["sampling_interval_s"])
+        if int(info["saved_frame_count"]) != len(rows):
+            raise ValueError(f"Saved frame count mismatch: {folder}")
+    prefix = f"sequences/{info['sequence']}/{info['sensor']}/{info['camera']}"
+    previous_time = None
     for i, row in enumerate(rows):
-        image = folder / "images" / f"f{i:06d}.png"
-        meta = read_info(folder / "meta" / f"f{i:06d}.txt")
-        if meta["id"] != row["id"] or meta["source_id"] != source_id or meta["decoded_frame_index"] != str(i):
+        name = Path(row["image"]).name
+        match = re.fullmatch(r"f(\d{6,})\.png", name)
+        if not match:
+            raise ValueError(f"Invalid frame filename: {name}")
+        source_index = int(match[1])
+        if source_index <= previous or (not sampled and source_index != i):
+            raise ValueError(f"Invalid source frame order: {folder}")
+        previous = source_index
+        image = folder / "images" / name
+        meta = read_info(folder / "meta" / Path(name).with_suffix(".txt").name)
+        if meta["id"] != row["id"] or meta["source_id"] != source_id or meta["decoded_frame_index"] != str(source_index):
             raise ValueError(f"Frame identity mismatch: {image}")
+        if (row["image"] != f"{prefix}/images/{name}" or
+                row["meta"] != f"{prefix}/meta/{Path(name).stem}.txt" or
+                any(row[k] != meta[m] for k, m in (("pts", "pts"), ("pts_time", "pts_time_s"), ("time_base", "time_base")))):
+            raise ValueError(f"Frame receipt mismatch: {image}")
+        if sampled:
+            if (i == 0 and source_index != 0 or source_index >= int(info["source_decoded_frame_count"]) or
+                    meta.get("saved_frame_index") != str(i) or normalize_interval(meta.get("sampling_interval_s")) != interval):
+                raise ValueError(f"Sampling identity mismatch: {image}")
+            timestamp = int(row["pts"])*Fraction(row["time_base"])
+            if previous_time is not None and float(timestamp-previous_time)+1e-9 < interval:
+                raise ValueError(f"Sampling interval mismatch: {image}")
+            previous_time = timestamp
         if deep and sha256(image) != row["image_sha256"]:
             raise ValueError(f"Image changed: {image}")
     return rows
 
 
 def extract(asset, stream: dict, output: Path, run: Path, config: dict, key: str,
-            ffmpeg: str, template: dict) -> dict:
+            ffmpeg: str, template: dict, *, interval=None) -> dict:
+    from north16.camera.sampling import normalize_interval, parse_sampled_log, video_filter
+    interval = normalize_interval(interval)
     folder = output / "sequences" / asset.sequence / asset.sensor / asset.camera
     reserved = False
     if folder.exists():
@@ -76,8 +108,9 @@ def extract(asset, stream: dict, output: Path, run: Path, config: dict, key: str
     log = run / "decoder" / (asset.source_id + ".log")
     log.parent.mkdir(parents=True, exist_ok=True)
     command = [ffmpeg, "-hide_banner", "-nostdin", "-nostats", "-loglevel", "info", "-n",
-               "-threads", "2", "-i", str(asset.path), "-map", "0:v:0", "-an", "-sn", "-dn",
-               "-filter_threads", "1", "-vf", "format=rgb24,showinfo", "-fps_mode", "passthrough",
+               "-threads", "2", *(["-copyts"] if interval is not None else []),
+               "-i", str(asset.path), "-map", "0:v:0", "-an", "-sn", "-dn",
+               "-filter_threads", "1", "-vf", video_filter(interval), "-fps_mode", "passthrough",
                "-c:v", "png", "-threads:v", "2", "-compression_level", "3", "-start_number", "0",
                str(staging / "images" / "f%06d.png")]
     write_text(run / "decoder" / (asset.source_id + ".command.json"), json.dumps(command, indent=2))
@@ -86,16 +119,29 @@ def extract(asset, stream: dict, output: Path, run: Path, config: dict, key: str
     if result.returncode:
         raise RuntimeError(f"Decode failed ({result.returncode}), retained staging {staging}; see {log}")
     text = log.read_text(encoding="utf-8", errors="replace")
-    matches = SHOW.findall(text)
-    base_match = TIME_BASE.search(text)
-    if not base_match or not matches or [int(m[0]) for m in matches] != list(range(len(matches))):
-        raise ValueError(f"Cannot establish exact decoded output/PTS correspondence: {log}")
-    time_base = base_match[1]
+    if interval is None:
+        matches = SHOW.findall(text)
+        base_match = TIME_BASE.search(text)
+        if not base_match or not matches or [int(m[0]) for m in matches] != list(range(len(matches))):
+            raise ValueError(f"Cannot establish exact decoded output/PTS correspondence: {log}")
+        time_base = base_match[1]
+        decoded_count = len(matches)
+    else:
+        matches, time_base, decoded_count = parse_sampled_log(text, interval)
     images = sorted((staging / "images").glob("*.png"))
     if len(images) != len(matches):
         raise ValueError(f"PNG/showinfo count mismatch: {staging}")
+    if interval is not None:
+        # Rename backwards so sparse source indices cannot collide with not-yet
+        # renamed sequential PNGs. Source index is always >= output ordinal.
+        for path, (index, _, _) in reversed(list(zip(images, matches))):
+            dest = path.with_name(f"f{int(index):06d}.png")
+            if dest != path:
+                path.rename(dest)
+        images = [staging/"images"/f"f{int(index):06d}.png" for index, _, _ in matches]
     rows = []
-    for i, (path, (_, pts, pts_time)) in enumerate(zip(images, matches)):
+    for saved_index, (path, (source_index, pts, pts_time)) in enumerate(zip(images, matches)):
+        i = int(source_index)
         with Image.open(path) as im:
             if im.format != "PNG" or im.mode != "RGB" or im.size != (stream["width"], stream["height"]):
                 raise ValueError(f"Unexpected extracted frame geometry: {path}")
@@ -112,6 +158,8 @@ def extract(asset, stream: dict, output: Path, run: Path, config: dict, key: str
                     source_log_path=f"sequences/{asset.sequence}/source/time.txt",
                     source_log_row_index="unknown", raw_timestamp_candidate="unknown",
                     time_mapping_status="unresolved", capture_time_utc="unknown", attribute_version="unknown")
+        if interval is not None:
+            meta.update(saved_frame_index=saved_index, sampling_interval_s=interval)
         for attr in ("weather", "illumination"):
             meta[attr] = "unknown"
             for suffix in ("source", "evidence_id", "confidence"):
@@ -140,6 +188,11 @@ def extract(asset, stream: dict, output: Path, run: Path, config: dict, key: str
                decode_status="complete", extraction_key=key, conversion_version="0.1.0",
                color_conversion="ffmpeg_swscale_default_to_rgb24_no_resize", diagnostic=diagnostic,
                decoder_log=log.relative_to(output).as_posix(), time_mapping_status="unresolved"))
+    if interval is not None:
+        info = read_info(staging / "info.txt")
+        info.update(frame_selection="minimum_pts_interval", sampling_interval_s=interval,
+                    source_decoded_frame_count=decoded_count, saved_frame_count=len(rows))
+        write_info(staging / "info.txt", info)
     if sha256(asset.path) != asset.digest:
         raise ValueError(f"Source changed during conversion: {asset.path}")
     if reserved:

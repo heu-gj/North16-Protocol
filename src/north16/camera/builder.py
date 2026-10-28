@@ -14,7 +14,8 @@ import yaml
 from north16 import __version__
 from north16.adapters.capture import Asset
 from north16.common.files import local_path, read_info, read_table, sha256, write_info
-from north16.preprocess.camera import extract, probe
+from north16.preprocess.camera import extract, probe, verify_stream
+from north16.camera.sampling import estimated_count, normalize_interval, video_filter
 from north16.preprocess.index import build_index
 from north16.resources import resource_root
 from north16.layout.paths import stream_path
@@ -29,7 +30,8 @@ class CameraBuilder:
         self.info = info
         self.sources = read_table(local_path(self.root,info.get("source_registry","sources.txt")))
 
-    def extract(self, *, sequences=None, sensor=None, cameras=None, ffmpeg="ffmpeg", ffprobe="ffprobe"):
+    def extract(self, *, sequences=None, sensor=None, cameras=None, ffmpeg="ffmpeg", ffprobe="ffprobe", interval=None):
+        interval = normalize_interval(interval)
         if self.info.get("camera_index") != "frames":
             raise ValueError("旧数据集保留原build复现入口；新抽帧请先initialize，旧数据集仍可camera export")
         if sensor not in (None, "visible", "infrared"):
@@ -44,6 +46,8 @@ class CameraBuilder:
         version = subprocess.check_output([ffmpeg, "-version"], text=True, encoding="utf-8", errors="replace").splitlines()[0]
         conversion = dict(version=__version__, ffmpeg=version, pixel_format="rgb24", filter="format=rgb24,showinfo",
                           fps_mode="passthrough", compression_level=3, frame_selection="all_decodable_source_frames")
+        if interval is not None:
+            conversion.update(filter=video_filter(interval), frame_selection="minimum_pts_interval", interval_seconds=interval, copyts=True)
         key = hashlib.sha256(json.dumps(conversion, sort_keys=True).encode()).hexdigest()
         # Validate all sources/stream placeholders and capacity before decoding.
         pending = []
@@ -58,12 +62,12 @@ class CameraBuilder:
             current = read_info(folder/"info.txt")
             if current["source_id"] != asset.source_id:
                 raise ValueError("相机目录来源冲突")
+            if current.get("decode_status") != "pending":
+                verify_stream(folder, key=key, source_id=asset.source_id)
             stream = probe(path, ffprobe)
             if current.get("decode_status") == "pending":
-                count = stream.get("nb_frames")
-                if not str(count).isdigit():
-                    raise ValueError("无法估计抽帧容量，未开始解码")
-                budget += int(stream["width"])*int(stream["height"])*3*int(count)*1.2
+                count = estimated_count(stream, interval)
+                budget += int(stream["width"])*int(stream["height"])*3*count*1.2
             pending.append((row, asset, stream))
         import shutil
         if shutil.disk_usage(self.root).free < budget:
@@ -78,13 +82,15 @@ class CameraBuilder:
             for row, asset, stream in pending:
                 config = dict(inputs=[dict(session_id=row["session_id"], raw_root_id=row["raw_root_id"])])
                 results.append(extract(asset, stream, self.root, run, config, key, ffmpeg,
-                                       read_info(resources.joinpath("templates/txt/frame.txt"))))
+                                       read_info(resources.joinpath("templates/txt/frame.txt")), interval=interval))
             rows = build_index(self.root, protocol)
             info = read_info(self.root/"info.txt")
             info.update(sample_count=len(rows), camera_status="partially_or_fully_extracted", latest_camera_run=run.relative_to(self.root).as_posix())
             write_info(self.root/"info.txt", info)
             report = dict(status="succeeded", streams=len(results), images=sum(r["count"] for r in results),
-                          reused_streams=sum(r["reused"] for r in results), budget_bytes=int(budget))
+                          reused_streams=sum(r["reused"] for r in results), budget_bytes=int(budget),
+                          frame_selection=conversion["frame_selection"], interval_seconds=interval)
+            write_info(run/"conversion.txt", conversion)
             write_info(run/"info.txt", report)
             return report
         except Exception as exc:
@@ -118,12 +124,14 @@ def main(argv=None):
     parser.add_argument("--cameras", nargs="+")
     parser.add_argument("--ffmpeg", default="ffmpeg")
     parser.add_argument("--ffprobe", default="ffprobe")
+    parser.add_argument("--interval", type=float, help="Minimum seconds between saved frames; omit to save all frames (e.g. 5)")
     args = parser.parse_args(argv)
     builder = CameraBuilder(args.root)
     selection = dict(sequences=args.sequences, sensor=args.sensor, cameras=args.cameras)
     if args.action == "extract":
-        report = builder.extract(**selection, ffmpeg=args.ffmpeg, ffprobe=args.ffprobe)
+        report = builder.extract(**selection, ffmpeg=args.ffmpeg, ffprobe=args.ffprobe, interval=args.interval)
     else:
+        if args.interval is not None:parser.error("--interval only applies to extract")
         if not args.output:parser.error("export requires --output")
         report = builder.export(args.output, **selection)
     print(json.dumps(report, ensure_ascii=False, indent=2))
