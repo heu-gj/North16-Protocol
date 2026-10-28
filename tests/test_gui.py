@@ -152,10 +152,10 @@ class DesktopTests(unittest.TestCase):
             window=Window(root)
             window.resize(1400,900);window.show();app.processEvents()
             window.parameters.inputs["working_width"].setValue(256)
-            old=window.original_view.points[2][1]
-            handle=window.original_view.handles[2]
+            old=window.original_view.points[1][1]
+            handle=window.original_view.handles[1]
             handle.setPos(handle.pos().x(),handle.pos().y()+5)
-            self.assertGreater(window.current_profile()["horizon_normalized_xy"][2][1],old)
+            self.assertGreater(window.current_profile()["horizon_normalized_xy"][1][1],old)
             QTest.mouseClick(window.preview_button,Qt.MouseButton.LeftButton)
             deadline=time.monotonic()+30
             while window.active_worker and time.monotonic()<deadline:

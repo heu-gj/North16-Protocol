@@ -11,7 +11,7 @@ from pathlib import Path
 DEFAULT_PROFILE = {
     "sea_mode": "mixed",
     "working_wh": [1280, 720],
-    "horizon_normalized_xy": [[0, .475], [.25, .472], [.5, .472], [.75, .465], [1, .455]],
+    "horizon_normalized_xy": [[0, .475], [1, .455]],
     "horizon_ignore_half_height": .01,
     "water_definite_brightness_max": 78,
     "water_probable_brightness_max": 125,

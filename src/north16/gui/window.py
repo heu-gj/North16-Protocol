@@ -34,6 +34,7 @@ class Window(QMainWindow):
         self.estimations, self.last_estimation = {}, None
         self.dataset_workspace, self.stream_key, self.last_dataset = None, None, None
         self.stream_profiles = {}
+        self.copied_profile = None
         self.camera_estimations = {}
         self.camera_previews = {}
         self.camera_selections = {}
@@ -237,6 +238,18 @@ class Window(QMainWindow):
         config_layout.addWidget(self.note)
         self.load_button = self.button("加载参数 JSON", self.load_parameters, config_layout)
         self.save_button = self.button("保存参数及验证记录", self.save_parameters, config_layout)
+        transfer_row = QHBoxLayout()
+        self.copy_profile_button = self.button("复制当前参数", self.copy_parameters, transfer_row)
+        self.paste_profile_button = self.button("粘贴到当前镜头", self.paste_parameters, transfer_row)
+        config_layout.addLayout(transfer_row)
+        self.apply_all_profiles_button = self.button("当前参数应用到本片段全部镜头", self.apply_parameters_to_all_cameras, config_layout)
+        self.profile_clipboard_label = QLabel("未复制参数；复制后可切换镜头粘贴。")
+        self.profile_clipboard_label.setWordWrap(True)
+        self.profile_clipboard_label.setStyleSheet("color:#47617a; font-weight:normal;")
+        config_layout.addWidget(self.profile_clipboard_label)
+        self.copy_profile_button.setToolTip("复制完整分割参数快照（含地平线、海面模式、阈值），在当前窗口中保留。跨次启动复用请保存参数JSON。")
+        self.paste_profile_button.setToolTip("用已复制的参数替换当前镜头参数；不复制来源镜头的预览、估参依据或验证记录。")
+        self.apply_all_profiles_button.setToolTip("使用右侧当前参数，替换当前片段所有已加载visible镜头参数，包括未勾选镜头；其他片段和infrared不受影响。")
         right_layout.addWidget(group)
         group = QGroupBox("3  生成与人工修正")
         batch_layout = QVBoxLayout(group)
@@ -300,6 +313,7 @@ class Window(QMainWindow):
             "自动估计默认保留当前地平线，仅估计冰水阈值；取消保留后仅尝试地平线候选，有歧义时不替换。\n"
             "仅有冰或仅有水时选择对应海面模式。此时不运行冰水二分，海面按指定类别填充；混合帧需切回混合模式。\n"
             "3.参数变化后旧结果会标记过期，需重新预览。\n"
+            "配置版本中可复制当前参数，切换镜头后粘贴；也可将当前参数应用到本片段全部可见光镜头（不受勾选限制）。参数JSON可跨次启动保存/加载。\n"
             "4.多图验证只显示预标注一致性预览，不代表准确率；保存配置保留来源和哈希。\n"
             "5.annotation工作区：保存按钮将JSON写到同镜头masks，图片保留在images；导出图片＋标签整包后用import-package导入最终数据集。\n"
             "6.旧数据集模式仍生成独立标签包。整包校验导入后可由Dataset读取；已有标签不覆盖。\n"
@@ -651,6 +665,9 @@ class Window(QMainWindow):
                         self.reset_button, self.load_button, self.save_button, self.save_current_button,
                         self.batch_button, self.export_button, self.keep_horizon):
             control.setEnabled(not active and not infrared)
+        self.copy_profile_button.setEnabled(not active and not infrared)
+        self.paste_profile_button.setEnabled(not active and not infrared and self.copied_profile is not None)
+        self.apply_all_profiles_button.setEnabled(not active and not infrared and self.dataset_workspace is not None and self.stream_key is not None)
         self.export_button.setEnabled(not active and (self.annotation_mode() or not infrared))
         self.horizon_toggle.setEnabled(not active and not infrared)
         self.horizon_mode.setEnabled(not active and not infrared)
@@ -901,6 +918,52 @@ class Window(QMainWindow):
         self.start(lambda cancel,progress:validate_camera_samples(builder,sequence,cancel=cancel,progress=progress,**options),
                    complete,"正在并行验证各镜头开头 / 中间 / 末尾…")
 
+    def copy_parameters(self):
+        if self.active_worker or not self.require_visible():return
+        try:
+            self.copied_profile = deepcopy(self.current_profile())
+        except Exception as exc:
+            self.error(str(exc));return
+        self.remember_stream()
+        source = " / ".join(self.stream_key) if self.stream_key else "当前图片文件夹"
+        self.profile_clipboard_label.setText(f"已复制：{source}\n参数 {profile_hash(self.copied_profile)[:10]} · 当前窗口有效")
+        self.paste_profile_button.setEnabled(True)
+        self.status_label.setText("参数快照已复制；可切换镜头后粘贴。跨次启动复用请保存参数JSON。")
+
+    def paste_parameters(self):
+        if self.active_worker or not self.require_visible():return
+        if self.copied_profile is None:
+            self.error("请先复制一组参数");return
+        profile = deepcopy(self.copied_profile)
+        if self.dataset_workspace and self.stream_key:
+            self.apply_camera_results([dict(camera=self.stream_key[2],profile=profile)])
+        else:
+            self.apply_profile(profile)
+            self.mask,self.result_key=None,None
+            self.refresh_display()
+        self.last_estimation = None
+        self.estimate_label.setText("已粘贴参数 · 请检查本镜头地平线并重新预览、验证")
+        self.parallel_estimate.setChecked(False)
+        self.remember_stream()
+        self.status_label.setText("已粘贴到当前镜头，批量生成将使用当前参数；请重新预览、验证。")
+
+    def apply_parameters_to_all_cameras(self):
+        if self.active_worker or not self.require_visible():return
+        if not self.dataset_workspace or not self.stream_key:
+            self.error("请先打开结构化数据集或标注工作区并选择片段");return
+        try:
+            self.dataset_workspace.assert_unchanged()
+            profile=self.current_profile()
+            sequence=self.stream_key[0]
+            keys=[key for key in self.dataset_workspace.keys() if key[0]==sequence]
+        except Exception as exc:
+            self.error(str(exc));return
+        self.apply_camera_results([dict(camera=key[2],profile=deepcopy(profile)) for key in keys])
+        self.last_estimation = None
+        self.estimate_label.setText("参数已应用到本片段全部可见光镜头 · 请逐镜头检查并验证")
+        self.parallel_estimate.setChecked(False)
+        self.status_label.setText(f"当前参数已应用到 {sequence} 全部 {len(keys)} 路可见光镜头（含未勾选）；请刷新预览并验证。")
+
     def load_parameters(self):
         path, _ = QFileDialog.getOpenFileName(self, "加载参数", "", "JSON (*.json)")
         if path:
@@ -942,6 +1005,8 @@ class Window(QMainWindow):
             if self.dataset_workspace and not self.annotation_mode():
                 from north16.packages import refresh_package
                 refresh_package(Path(self.output_field.text()), kind="segmentation", protocol_id=self.dataset_workspace.protocol["protocol_id"])
+            self.copy_parameters()
+            self.status_label.setText("参数JSON与验证记录已保存，并已复制参数快照，可切换镜头粘贴。")
         except Exception as exc:
             self.error(str(exc))
 

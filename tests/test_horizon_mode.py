@@ -33,6 +33,13 @@ class HorizonModeTests(unittest.TestCase):
             w = Window(root)
             self.addCleanup(w.close)
             w.show(); self.app.processEvents()
+            self.assertEqual(w.horizon_mode.currentData(), 'line')
+            self.assertEqual(len(w.original_view.handles), 2)
+            # Explicitly loaded legacy polylines remain supported.
+            legacy=deepcopy(DEFAULT_PROFILE)
+            legacy['horizon_normalized_xy']=[[0,.475],[.25,.472],[.5,.472],[.75,.465],[1,.455]]
+            w.apply_profile(legacy)
+            self.assertEqual(w.horizon_mode.currentData(), 'polyline')
             old = deepcopy(w.original_view.points)
             w.horizon_mode.setCurrentIndex(w.horizon_mode.findData('line'))
             self.assertEqual(w.original_view.points, [old[0], old[-1]])
@@ -54,7 +61,7 @@ class HorizonModeTests(unittest.TestCase):
             self.assertEqual(data['north16']['parameters']['horizon_normalized_xy'], p['horizon_normalized_xy'])
             np.testing.assert_array_equal(render(data), expected)
             w.camera_combo.setCurrentText('back_04')
-            self.assertEqual(w.horizon_mode.currentData(), 'polyline')
+            self.assertEqual(w.horizon_mode.currentData(), 'line')
             self.assertEqual(w.original_view.points, DEFAULT_PROFILE['horizon_normalized_xy'])
             w.camera_combo.setCurrentText(key[2])
             self.assertEqual(w.horizon_mode.currentData(), 'line')

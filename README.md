@@ -1,6 +1,6 @@
 # North16 Protocol
 
-海冰数据集的结构化管理、相机抽帧、可见光预标注和 Dataset 读取工具。Python 包名、导入名和命令均为 **`north16`**，当前版本 **0.11.0**，要求 **Python 3.10+**。
+海冰数据集的结构化管理、相机抽帧、可见光预标注和 Dataset 读取工具。Python 包名、导入名和命令均为 **`north16`**，当前版本 **0.12.0**，要求 **Python 3.10+**。
 
 原始视频 → 初始化最终目录 → 独立标注工作区抽帧与标注 → 图片＋JSON 整包交付 → Dataset 读取与审核。
 
@@ -29,10 +29,10 @@ python -m pip install .
 python -m pip install -e ".[gui]"
 
 # 从 GitHub 固定版本安装，无需手动克隆
-python -m pip install "north16[gui] @ git+https://github.com/heu-gj/North16-Protocol.git@v0.11.0"
+python -m pip install "north16[gui] @ git+https://github.com/heu-gj/North16-Protocol.git@v0.12.0"
 
 # 从 GitHub Releases 下载 wheel 后安装
-python -m pip install ".\north16-0.11.0-py3-none-any.whl[gui]"
+python -m pip install ".\north16-0.12.0-py3-none-any.whl[gui]"
 ```
 
 安装 wheel 后可在任意目录使用 `north16` 或 `python -m north16`，无需复制 `src/` 或配置 `PYTHONPATH`。从源码目录运行时也支持 `python cli.py ...`。这些安装方式不依赖 PyPI 发布。
@@ -70,6 +70,8 @@ north16 import-package --root E:\data\datasets --package E:\data\delivery
 ```
 
 界面选择 visible，在16路总览点击镜头独立调参，设置两点地平线（忽略半宽默认1.00%）、冰水混合/全冰/全水模式，估计并调整阈值，验证首/中/末，再勾选镜头并点击“保存勾选镜头的标签”。这些操作将 JSON 写入工作区同镜头 masks；不复制图片。
+
+地平线默认两点直线。右侧“配置版本”可保存并复制参数，换镜头粘贴，或将当前参数一键应用到本片段全部visible镜头（包括未勾选镜头）。各镜头仍可独立微调；刷新预览并验证后再生成标签。跨次启动复用可保存/加载参数JSON。
 
 点击“导出图片＋标签整包”交付当前片段勾选的 visible 镜头；红外浏览时交付当前镜头。CLI 可用 `--sequences`、`--sensor`、`--cameras` 筛选，不筛选则交付全部完整镜头。包内包括选中镜头的所有图片（也包括未标注帧），报告单列未标注数量。旧 datasets 的外置标签包流程仍兼容。
 
@@ -126,7 +128,7 @@ python -m build
 python -m twine check dist/*
 ```
 
-产物为 `dist/north16-0.11.0-py3-none-any.whl` 和 `dist/north16-0.11.0.tar.gz`，包含 Python 模块、协议配置、TXT 模板和文档。原始视频、数据集、运行标签、虚拟环境和备份不打入包。
+产物为 `dist/north16-0.12.0-py3-none-any.whl` 和 `dist/north16-0.12.0.tar.gz`，包含 Python 模块、协议配置、TXT 模板和文档。原始视频、数据集、运行标签、虚拟环境和备份不打入包。
 
 ```powershell
 python -m pip install ".[all]"
