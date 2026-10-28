@@ -99,3 +99,18 @@ python cli.py import-package --help
 ```
 
 `initialize`才是新的纯目录初始化；历史`init`仍用于创建配置项目，`build`保留旧整体构建流程。各模块规则见[MODULES.md](MODULES.md)。Python API与Dataset类保持可用。
+
+
+## 抽帧进度（0.13.0）
+
+`north16 annotation extract` 与 `north16 camera extract` 默认显示命令行进度，无需额外参数：预检当前镜头、镜头序号/总路数、源视频解码帧数/预计总帧数、已选择输出帧数、图片校验与元信息生成进度、提交与复用状态。
+
+```powershell
+north16 annotation extract --root E:\data\annotation --interval 5
+# 自动化脚本需要关闭进度时：
+north16 annotation extract --root E:\data\annotation --interval 5 --no-progress
+```
+
+终端中使用原行刷新的进度条；重定向日志时使用节流后的分阶段记录。进度写入stderr，最终JSON报告仍写入stdout。`--dry-run`只预检、不显示抽帧进度。单视频百分比基于源解码帧数的估计值，不基于稀疏保存帧数；预计帧数不可用时显示计数。解码阶段最多显示99%，所有镜头校验、索引与提交成功后才显示整体100%。某镜头完成后显示其实际图片数。间隔抽帧也仍需解码源视频，进度中“已选输出”表示过滤器选中的帧，实际保存/校验数量以最终报告为准。失败不显示成功完成。
+
+Python API可传 `CameraBuilder.extract(progress=callback)` 或 `AnnotationWorkspace.extract(progress=callback)`，callback接收阶段事件字典；不传时库调用保持安静。阶段包括preflight、stream_start、decode、verify、publish、stream_done、done、failed，镜头阶段包含sequence/sensor/camera及stream_index/streams；decode包含done/total/selected，verify包含done/total。

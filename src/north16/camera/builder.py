@@ -30,7 +30,7 @@ class CameraBuilder:
         self.info = info
         self.sources = read_table(local_path(self.root,info.get("source_registry","sources.txt")))
 
-    def extract(self, *, sequences=None, sensor=None, cameras=None, ffmpeg="ffmpeg", ffprobe="ffprobe", interval=None, dry_run=False):
+    def extract(self, *, sequences=None, sensor=None, cameras=None, ffmpeg="ffmpeg", ffprobe="ffprobe", interval=None, dry_run=False, progress=None):
         interval = normalize_interval(interval)
         if self.info.get("camera_index") != "frames":
             raise ValueError("旧数据集保留原build复现入口；新抽帧请先initialize，旧数据集仍可camera export")
@@ -53,7 +53,9 @@ class CameraBuilder:
         pending = []
         budget = 0
         stream_details = []
-        for row in sources:
+        for index,row in enumerate(sources,1):
+            if progress:progress(dict(phase='preflight',stream_index=index,streams=len(sources),
+                                     sequence=row['sequence'],sensor=row['sensor'],camera=row['camera']))
             path = Path(row["source_absolute_path"]).resolve(strict=True)
             if sha256(path) != row["sha256"]:
                 raise ValueError(f"原视频校验失败：{path}")
@@ -103,10 +105,23 @@ class CameraBuilder:
         results = []
         try:
             run.mkdir(parents=True)
-            for row, asset, stream in pending:
+            for index,(row, asset, stream) in enumerate(pending,1):
+                context=dict(stream_index=index,streams=len(pending),sequence=asset.sequence,sensor=asset.sensor,camera=asset.camera)
+                def update(event):
+                    if progress:progress(dict(context,**event))
+                update(dict(phase='stream_start'))
                 config = dict(inputs=[dict(session_id=row["session_id"], raw_root_id=row["raw_root_id"])])
-                results.append(extract(asset, stream, self.root, run, config, key, ffmpeg,
-                                       read_info(resources.joinpath("templates/txt/frame.txt")), interval=interval))
+                decode_progress=None
+                if progress:
+                    try:estimated=estimated_count(stream,None)
+                    except ValueError:estimated=None
+                    def decode_progress(event):
+                        if event['phase']=='decode':event=dict(event,total=estimated)
+                        update(event)
+                result=extract(asset, stream, self.root, run, config, key, ffmpeg,
+                               read_info(resources.joinpath("templates/txt/frame.txt")), interval=interval,progress=decode_progress)
+                results.append(result)
+                update(dict(phase='stream_done',images=result['count'],reused=result['reused']))
             rows = build_index(self.root, protocol)
             info = read_info(self.root/"info.txt")
             info.update(sample_count=len(rows), camera_status="partially_or_fully_extracted", latest_camera_run=run.relative_to(self.root).as_posix())
@@ -116,8 +131,10 @@ class CameraBuilder:
                           frame_selection=conversion["frame_selection"], interval_seconds=interval)
             write_info(run/"conversion.txt", conversion)
             write_info(run/"info.txt", report)
+            if progress:progress(dict(phase='done',streams=len(results),images=report['images']))
             return report
         except Exception as exc:
+            if progress:progress(dict(phase='failed'))
             write_info(run/"info.txt", dict(status="failed", error=str(exc).replace("\n", " ")))
             raise
         finally:
@@ -150,11 +167,14 @@ def main(argv=None):
     parser.add_argument("--ffprobe", default="ffprobe")
     parser.add_argument("--interval", type=float, help="Minimum seconds between saved frames; omit to save all frames (e.g. 5)")
     parser.add_argument("--dry-run", action="store_true", help="Read-only preflight: show selected streams, conservative disk budget and free space without extracting")
+    parser.add_argument("--no-progress",action="store_true",help="Disable stderr extraction progress")
     args = parser.parse_args(argv)
     builder = CameraBuilder(args.root)
     selection = dict(sequences=args.sequences, sensor=args.sensor, cameras=args.cameras)
     if args.action == "extract":
-        report = builder.extract(**selection, ffmpeg=args.ffmpeg, ffprobe=args.ffprobe, interval=args.interval, dry_run=args.dry_run)
+        from north16.camera.progress import ExtractionProgress
+        report = builder.extract(**selection, ffmpeg=args.ffmpeg, ffprobe=args.ffprobe, interval=args.interval, dry_run=args.dry_run,
+                                 progress=None if args.no_progress or args.dry_run else ExtractionProgress())
     else:
         if args.interval is not None:parser.error("--interval only applies to extract")
         if args.dry_run:parser.error("--dry-run only applies to extract")

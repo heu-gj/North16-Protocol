@@ -20,6 +20,7 @@ def main(argv=None):
         action.add_argument("--sequences",nargs="+");action.add_argument("--sensor",choices=("visible","infrared"))
         action.add_argument("--cameras",nargs="+")
     extract.add_argument("--interval",type=float);extract.add_argument("--dry-run",action="store_true")
+    extract.add_argument("--no-progress",action="store_true",help="Disable stderr extraction progress")
     extract.add_argument("--ffmpeg",default="ffmpeg");extract.add_argument("--ffprobe",default="ffprobe")
     export.add_argument("--output",required=True)
     args=parser.parse_args(argv)
@@ -33,6 +34,8 @@ def main(argv=None):
             return gui_main(["--dataset",str(workspace.root)])
         selection=dict(sequences=args.sequences,sensor=args.sensor,cameras=args.cameras)
         if args.action=="extract":
-            report=workspace.extract(**selection,interval=args.interval,dry_run=args.dry_run,ffmpeg=args.ffmpeg,ffprobe=args.ffprobe)
+            from north16.camera.progress import ExtractionProgress
+            report=workspace.extract(**selection,interval=args.interval,dry_run=args.dry_run,ffmpeg=args.ffmpeg,ffprobe=args.ffprobe,
+                                     progress=None if args.no_progress or args.dry_run else ExtractionProgress())
         else:report=workspace.export(args.output,**selection)
     print(json.dumps(report,ensure_ascii=False,indent=2))

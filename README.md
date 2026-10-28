@@ -1,6 +1,6 @@
 # North16 Protocol
 
-海冰数据集的结构化管理、相机抽帧、可见光预标注和 Dataset 读取工具。Python 包名、导入名和命令均为 **`north16`**，当前版本 **0.12.0**，要求 **Python 3.10+**。
+海冰数据集的结构化管理、相机抽帧、可见光预标注和 Dataset 读取工具。Python 包名、导入名和命令均为 **`north16`**，当前版本 **0.13.0**，要求 **Python 3.10+**。
 
 原始视频 → 初始化最终目录 → 独立标注工作区抽帧与标注 → 图片＋JSON 整包交付 → Dataset 读取与审核。
 
@@ -29,10 +29,10 @@ python -m pip install .
 python -m pip install -e ".[gui]"
 
 # 从 GitHub 固定版本安装，无需手动克隆
-python -m pip install "north16[gui] @ git+https://github.com/heu-gj/North16-Protocol.git@v0.12.0"
+python -m pip install "north16[gui] @ git+https://github.com/heu-gj/North16-Protocol.git@v0.13.0"
 
 # 从 GitHub Releases 下载 wheel 后安装
-python -m pip install ".\north16-0.12.0-py3-none-any.whl[gui]"
+python -m pip install ".\north16-0.13.0-py3-none-any.whl[gui]"
 ```
 
 安装 wheel 后可在任意目录使用 `north16` 或 `python -m north16`，无需复制 `src/` 或配置 `PYTHONPATH`。从源码目录运行时也支持 `python cli.py ...`。这些安装方式不依赖 PyPI 发布。
@@ -98,6 +98,8 @@ JSON 关联 `../images/<frame>.png`，支持人工修正。生成结果是 draft
 
 抽帧间隔按源PTS选择实际帧，保留原尺寸、源帧号与PTS/time_base，不插帧、不代表各设备已同步；已有完整流更换间隔会拒绝覆盖，请建立新工作区。现有目录发现适配 North16 采集布局，其他布局需适配。GrabCut 仅适配 visible；infrared 支持抽帧、浏览和像素查看。
 
+抽帧命令默认显示镜头序号、解码进度、选中帧数及图片校验进度；全部成功后显示100%。`--no-progress`可关闭，`--dry-run`不执行抽帧。进度输出到stderr，最终JSON保持在stdout。
+
 容量预检累计所选待处理流的宽×高×3×预计帧数×1.2，是RGB24未压缩保守估计，PNG实际可能更小。压缩视频较小并不代表抽帧占用小。可缩小片段/模态/镜头或增加间隔。工作区、交付包、最终数据集复制后各占一份空间，不自动删除源数据。
 
 ## Dataset 读取
@@ -128,7 +130,7 @@ python -m build
 python -m twine check dist/*
 ```
 
-产物为 `dist/north16-0.12.0-py3-none-any.whl` 和 `dist/north16-0.12.0.tar.gz`，包含 Python 模块、协议配置、TXT 模板和文档。原始视频、数据集、运行标签、虚拟环境和备份不打入包。
+产物为 `dist/north16-0.13.0-py3-none-any.whl` 和 `dist/north16-0.13.0.tar.gz`，包含 Python 模块、协议配置、TXT 模板和文档。原始视频、数据集、运行标签、虚拟环境和备份不打入包。
 
 ```powershell
 python -m pip install ".[all]"

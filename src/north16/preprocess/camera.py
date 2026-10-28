@@ -83,7 +83,7 @@ def verify_stream(folder: Path, *, key: str, source_id: str, deep: bool = True) 
 
 
 def extract(asset, stream: dict, output: Path, run: Path, config: dict, key: str,
-            ffmpeg: str, template: dict, *, interval=None) -> dict:
+            ffmpeg: str, template: dict, *, interval=None, progress=None) -> dict:
     from north16.camera.sampling import normalize_interval, parse_sampled_log, video_filter
     interval = normalize_interval(interval)
     folder = output / "sequences" / asset.sequence / asset.sensor / asset.camera
@@ -114,10 +114,10 @@ def extract(asset, stream: dict, output: Path, run: Path, config: dict, key: str
                "-c:v", "png", "-threads:v", "2", "-compression_level", "3", "-start_number", "0",
                str(staging / "images" / "f%06d.png")]
     write_text(run / "decoder" / (asset.source_id + ".command.json"), json.dumps(command, indent=2))
-    with log.open("wb") as handle:
-        result = subprocess.run(command, stdout=subprocess.DEVNULL, stderr=handle, timeout=3600)
-    if result.returncode:
-        raise RuntimeError(f"Decode failed ({result.returncode}), retained staging {staging}; see {log}")
+    from north16.preprocess.decoder import run_decoder
+    code=run_decoder(command,log,progress=progress,sampled=interval is not None)
+    if code:
+        raise RuntimeError(f"Decode failed ({code}), retained staging {staging}; see {log}")
     text = log.read_text(encoding="utf-8", errors="replace")
     if interval is None:
         matches = SHOW.findall(text)
@@ -140,6 +140,7 @@ def extract(asset, stream: dict, output: Path, run: Path, config: dict, key: str
                 path.rename(dest)
         images = [staging/"images"/f"f{int(index):06d}.png" for index, _, _ in matches]
     rows = []
+    if progress:progress(dict(phase='verify',done=0,total=len(images)))
     for saved_index, (path, (source_index, pts, pts_time)) in enumerate(zip(images, matches)):
         i = int(source_index)
         with Image.open(path) as im:
@@ -173,6 +174,7 @@ def extract(asset, stream: dict, output: Path, run: Path, config: dict, key: str
         write_info(staging / "meta" / path.with_suffix(".txt").name, meta, durable=False)
         rows.append(dict(zip(FRAME_COLUMNS, [frame_id, meta["image"], f"{prefix}/meta/{path.stem}.txt",
                                              digest, path.stat().st_size, meta["pts"], meta["pts_time_s"], time_base])))
+        if progress:progress(dict(phase='verify',done=saved_index+1,total=len(images)))
     warnings = [line.strip() for line in text.splitlines() if any(w in line.lower() for w in
                 ("error", "invalid", "corrupt", "damaged", "non monoton", "missing picture"))]
     diagnostic = "decoder_messages_present" if warnings else "none"
@@ -193,6 +195,7 @@ def extract(asset, stream: dict, output: Path, run: Path, config: dict, key: str
         info.update(frame_selection="minimum_pts_interval", sampling_interval_s=interval,
                     source_decoded_frame_count=decoded_count, saved_frame_count=len(rows))
         write_info(staging / "info.txt", info)
+    if progress:progress(dict(phase='publish'))
     if sha256(asset.path) != asset.digest:
         raise ValueError(f"Source changed during conversion: {asset.path}")
     if reserved:
