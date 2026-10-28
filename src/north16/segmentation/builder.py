@@ -21,6 +21,12 @@ class SegmentationBuilder:
         self.workspace=DatasetWorkspace(root)
         self.root=self.workspace.root
 
+    def payload_root(self, output):
+        return Path(output)/"dataset"
+
+    def finish_output(self, output):
+        refresh_package(output,kind="segmentation",protocol_id=self.workspace.protocol["protocol_id"])
+
     def _prepare(self, key, images, profile):
         from north16.annotations.profiles import validate_profile
         profile=validate_profile(profile)
@@ -31,7 +37,7 @@ class SegmentationBuilder:
     def _destinations(self, images, observations, output):
         destinations=[]
         for image in images:
-            dest=local_path(output/"dataset",label_path(observations[str(image)]["image"]).as_posix())
+            dest=local_path(self.payload_root(output),label_path(observations[str(image)]["image"]).as_posix())
             if dest.exists():raise FileExistsError(f"标签已存在，保留人工修改：{dest}")
             destinations.append(dest)
         return destinations
@@ -102,7 +108,7 @@ class SegmentationBuilder:
         with self._package(output) as output:
             self._destinations(prepared["images"],prepared["observations"],output)
             report=self._generate_stream(prepared,output,cancel=cancel,progress=progress,estimation=estimation)
-            refresh_package(output,kind="segmentation",protocol_id=self.workspace.protocol["protocol_id"])
+            self.finish_output(output)
             save_json(output/"last_run.json",report)
             return report
 
@@ -174,8 +180,12 @@ def main(argv=None):
     if args.action=="gui":
         from north16.gui.app import main as gui
         return gui(["--dataset",args.root])
+    from north16.annotation.workspace import builder_for, is_annotation, AnnotationWorkspace
+    annotation=is_annotation(args.root)
+    if args.action in ("generate","batch") and annotation and not args.output:
+        args.output=args.root
     if args.action!="estimate" and not args.output:parser.error("generate/batch/export requires --output")
-    builder=SegmentationBuilder(args.root)
+    builder=builder_for(args.root)
     if args.action in {"batch","estimate"}:
         if not args.sequence:parser.error("batch/estimate requires --sequence")
         if args.sensor=="infrared":parser.error("batch/estimate目前只支持visible")
@@ -194,7 +204,8 @@ def main(argv=None):
         if args.action=="estimate":report=builder.estimate_cameras(args.sequence,**options)
         else:report=builder.generate_cameras(args.sequence,args.output,estimate=not args.no_estimate,**options)
     elif args.action=="export":
-        report=builder.export(args.output,sequences=[args.sequence] if args.sequence else None,sensor=args.sensor,
+        exporter=AnnotationWorkspace(args.root) if annotation else builder
+        report=exporter.export(args.output,sequences=[args.sequence] if args.sequence else None,sensor=args.sensor,
                               cameras=[args.camera] if args.camera else None)
     else:
         if not args.sequence or not args.camera or not args.profile:parser.error("generate requires --sequence --camera --profile")

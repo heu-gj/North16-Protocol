@@ -1,3 +1,7 @@
+# 0.11.0工具补充：工作区与完整交付
+
+协议ID、类别、审核及评测要求保持不变。默认工具流程改为独立annotation抽帧/标注，完成后图片＋JSON＋meta以kind=annotation整包校验导入初始化好的datasets。规范见 [ANNOTATION.md](ANNOTATION.md)，配置见configs/protocol.yaml的annotation_workspace。自动标签仍是draft/unreviewed，完整交付不代表已人工审核或已认证同步。
+
 # North16 总协议
 
 协议 ID：`north16-seg-v0.1-draft`。文档修订：`design-v0.7`。日期：2026-10-23。状态：draft。

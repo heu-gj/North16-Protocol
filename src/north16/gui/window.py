@@ -97,7 +97,7 @@ class Window(QMainWindow):
         left.setMaximumWidth(280)
         left_layout = QVBoxLayout(left)
         left_layout.setContentsMargins(0, 0, 4, 0)
-        self.dataset_button = self.button("打开 north16 数据集", self.choose_dataset, left_layout, True)
+        self.dataset_button = self.button("打开数据集 / 标注工作区", self.choose_dataset, left_layout, True)
         self.sequence_combo, self.camera_combo = QComboBox(), QComboBox()
         self.sensor_combo = QComboBox()
         self.sensor_combo.addItem("可见光 visible", "visible")
@@ -301,10 +301,10 @@ class Window(QMainWindow):
             "仅有冰或仅有水时选择对应海面模式。此时不运行冰水二分，海面按指定类别填充；混合帧需切回混合模式。\n"
             "3.参数变化后旧结果会标记过期，需重新预览。\n"
             "4.多图验证只显示预标注一致性预览，不代表准确率；保存配置保留来源和哈希。\n"
-            "5.数据集模式直接导出dataset/sequences/<片段>/<模态>/<镜头>/masks/*.json，保留原帧名与样本ID。不同镜头共用标签包。\n"
-            "6.将标签包中dataset的内容整体合并到数据集根目录，即可由Dataset读取；已有标签不覆盖。\n"
+            "5.annotation工作区：保存按钮将JSON写到同镜头masks，图片保留在images；导出图片＋标签整包后用import-package导入最终数据集。\n"
+            "6.旧数据集模式仍生成独立标签包。整包校验导入后可由Dataset读取；已有标签不覆盖。\n"
             "7.取消会在当前图片计算结束后生效，已完成文件保留。\n"
-            "8.切换16路总览可同时查看各镜头结果，点击卡片独立调试。勾选只控制批量导出；已有标签时自动使用新包，避免混入历史镜头。")
+            "8.切换16路总览可同时查看各镜头结果，点击卡片独立调试。勾选控制批量保存和整包交付范围。工作区已有标签会拒绝重新生成，请保留人工修改。")
 
     def choose_folder(self):
         folder = QFileDialog.getExistingDirectory(self, "选择直接包含图片的文件夹")
@@ -417,13 +417,22 @@ class Window(QMainWindow):
         self.busy(False)
 
     def set_dataset_output(self):
+        annotation=self.annotation_mode()
         if self.dataset_workspace and self.stream_key:
             root = self.dataset_workspace.root
-            output = self.label_packages.setdefault(str(root), root.parent / "labels" / self.dataset_workspace.new_run_id())
+            output = root if annotation else self.label_packages.setdefault(str(root), root.parent / "labels" / self.dataset_workspace.new_run_id())
             self.output_field.setText(str(output))
-            self.output_field.setToolTip("整包导出位置；不同片段/镜头共用。标签位于dataset/sequences/.../masks/*.json")
+            self.output_field.setToolTip("工作区就地保存：sequences/.../masks/*.json；图片位于同镜头images。" if annotation else
+                                         "整包导出位置；不同片段/镜头共用。标签位于dataset/sequences/.../masks/*.json")
         self.output_field.setReadOnly(self.dataset_workspace is not None)
-        self.output_button.setEnabled(True)
+        self.output_button.setEnabled(not annotation)
+        self.export_button.setText("导出图片＋标签整包" if annotation else "查看最近标签包")
+        self.parallel_button.setText("保存勾选镜头的标签" if annotation else "导出勾选镜头的标签")
+        self.parallel_button.setToolTip("保存到工作区同镜头masks；已有标签拒绝覆盖。完成后用下方按钮导出图片＋标签整包。" if annotation else
+                                       "处理勾选镜头在当前片段中的全部图片；已有标签时自动使用新的标签包。")
+
+    def annotation_mode(self):
+        return bool(self.dataset_workspace and self.dataset_workspace.info.get("workspace_role")=="annotation")
 
     def open_folder(self, folder):
         if self.active_worker:
@@ -626,7 +635,7 @@ class Window(QMainWindow):
         self.dataset_button.setEnabled(not active)
         self.sequence_combo.setEnabled(not active and self.dataset_workspace is not None)
         self.camera_combo.setEnabled(not active and self.dataset_workspace is not None)
-        self.output_button.setEnabled(not active)
+        self.output_button.setEnabled(not active and not self.annotation_mode())
         self.sensor_combo.setEnabled(not active)
         for control in (self.parallel_workers,self.parallel_estimate,self.estimate_cameras_button,self.parallel_button):
             control.setEnabled(not active and self.dataset_workspace is not None and self.current_sensor() != "infrared")
@@ -642,6 +651,7 @@ class Window(QMainWindow):
                         self.reset_button, self.load_button, self.save_button, self.save_current_button,
                         self.batch_button, self.export_button, self.keep_horizon):
             control.setEnabled(not active and not infrared)
+        self.export_button.setEnabled(not active and (self.annotation_mode() or not infrared))
         self.horizon_toggle.setEnabled(not active and not infrared)
         self.horizon_mode.setEnabled(not active and not infrared)
         self.original_view.set_horizon(self.original_view.points, self.original_view.band,
@@ -929,13 +939,14 @@ class Window(QMainWindow):
                 status="sampled_unreviewed" if self.validations_for_profile(profile) else "not_sampled",
                 review_status="unreviewed", saved_at=datetime.now().astimezone().isoformat()))
             self.status_label.setText("参数与抽样记录已保存")
-            if self.dataset_workspace:
+            if self.dataset_workspace and not self.annotation_mode():
                 from north16.packages import refresh_package
                 refresh_package(Path(self.output_field.text()), kind="segmentation", protocol_id=self.dataset_workspace.protocol["protocol_id"])
         except Exception as exc:
             self.error(str(exc))
 
     def choose_output(self):
+        if self.annotation_mode():return
         if self.dataset_workspace:
             parent = QFileDialog.getExistingDirectory(self, "选择标签包父目录（自动创建新包，可容纳多个镜头）")
             if parent:
@@ -1084,13 +1095,13 @@ class Window(QMainWindow):
                    cancel=cancel,progress=progress,**options),complete,"正在生成各镜头结果总览…")
 
     def camera_batch_context(self):
-        from north16.segmentation import SegmentationBuilder
+        from north16.annotation.workspace import builder_for
         if not self.dataset_workspace or not self.stream_key:
             raise ValueError("请先打开north16结构化数据集并选择片段")
         self.current_profile()  # Invalid edits must not silently fall back to a saved profile.
         self.remember_stream()
         self.dataset_workspace.assert_unchanged()
-        builder=SegmentationBuilder(self.dataset_workspace.root)
+        builder=builder_for(self.dataset_workspace.root)
         builder.workspace=self.dataset_workspace
         root=str(builder.root)
         sequence=self.stream_key[0]
@@ -1160,7 +1171,7 @@ class Window(QMainWindow):
             output=Path(self.output_field.text()).resolve()
             # A selection export is a self-contained package. Historical labels
             # from another camera must never leak into this selection.
-            if (output/"dataset").exists() and any(p.is_file() for p in (output/"dataset").rglob("*")):
+            if not self.annotation_mode() and (output/"dataset").exists() and any(p.is_file() for p in (output/"dataset").rglob("*")):
                 output=output.parent/builder.workspace.new_run_id()
             estimate=self.parallel_estimate.isChecked()
             root=str(builder.root)
@@ -1183,10 +1194,10 @@ class Window(QMainWindow):
             return
         if self.dataset_workspace:
             try:
-                from north16.segmentation import SegmentationBuilder
+                from north16.annotation.workspace import builder_for
                 output = Path(self.output_field.text()).resolve()
                 profile = self.current_profile()
-                builder = SegmentationBuilder(self.dataset_workspace.root)
+                builder = builder_for(self.dataset_workspace.root)
                 # Verify original workspace snapshots too; newly opening a builder
                 # must not hide changes made after the GUI loaded the data.
                 self.dataset_workspace.assert_unchanged()
@@ -1197,7 +1208,7 @@ class Window(QMainWindow):
                     return builder.generate(key, image_list, profile, output, cancel=cancel, progress=progress,
                                             estimation=self.estimation_for_profile(profile))
                 self.start(compute, lambda report: self.job_complete(report, output, (self.dataset_workspace, key)),
-                           "正在导出 masks/*.json 标签包…")
+                           "正在保存 masks/*.json…" if self.annotation_mode() else "正在导出 masks/*.json 标签包…")
             except Exception as exc:
                 self.error(str(exc))
             return
@@ -1240,6 +1251,8 @@ class Window(QMainWindow):
             QMessageBox.warning(self, "部分图片失败", "任务记录已保存，请查看last_run.json中的错误。")
 
     def run_export(self):
+        if self.annotation_mode():
+            return self.export_annotation_workspace()
         if self.last_output and (self.last_output/"last_run.json").is_file():
             QMessageBox.information(self, "JSON标签输出", f"标签已直接保存到masks，无需二次导出。\n{self.last_output}\n\n结构化标签包：将dataset内的内容整体合并到数据集根目录。\n普通文件夹输出：images与masks平级保存。")
             return
@@ -1265,6 +1278,31 @@ class Window(QMainWindow):
             self.status_label.setText(f"编辑工程 {report['status']} · {report['succeeded']} 张 · {output}")
             QMessageBox.information(self, "编辑工程已保存", f"在X-AnyLabeling中打开：\n{output/'images'}\n\n修正回读命令见工程README.txt")
         self.start(lambda cancel, progress: export_editor(source, output, cancel=cancel, progress=progress), complete, "正在导出可编辑多边形…")
+
+    def export_annotation_workspace(self):
+        if self.active_worker:return
+        cameras=self.overview.selected_cameras() if self.current_sensor()=="visible" else [self.stream_key[2]]
+        if not cameras:
+            self.error("请先勾选要交付的镜头");return
+        parent=QFileDialog.getExistingDirectory(self,"选择图片＋标签交付包父目录（当前片段；可见光勾选镜头/红外当前镜头；含未标注图片）")
+        if not parent:return
+        from north16.annotation import AnnotationWorkspace
+        workspace=AnnotationWorkspace(self.dataset_workspace.root)
+        output=Path(parent)/("annotation_"+self.dataset_workspace.new_run_id())
+        sequence=self.stream_key[0];sensor=self.current_sensor()
+        def compute(cancel,progress):
+            if cancel.is_set():return None
+            return workspace.export(output,sequences=[sequence],sensor=sensor,cameras=cameras,
+                                    cancel=cancel,progress=progress)
+        def complete(report):
+            if report is None:return
+            if report.get("status")=="cancelled":
+                self.status_label.setText("整包导出已停止，未生成交付包；工作区图片和标注保留。")
+                return
+            self.last_output=output
+            self.status_label.setText(f"整包导出完成：{report['images']} 张图片 / {report['labels']} 个标签 / "
+                                      f"{report['unlabeled_images']} 张未标注 · {output}")
+        self.start(compute,complete,"正在校验并复制图片＋标签整包；原图和已有标注保留…")
 
     def open_output(self):
         if self.last_output:

@@ -143,7 +143,7 @@ def generate_cameras(builder, sequence, output, *, cameras=None, profiles=None, 
         # This also protects labels manually edited since a preceding run.
         for item in items:
             for image in item["images"]:
-                dest=local_path(output/"dataset",label_path(image.relative_to(builder.root).as_posix()).as_posix())
+                dest=local_path(builder.payload_root(output),label_path(image.relative_to(builder.root).as_posix()).as_posix())
                 if dest.exists():raise FileExistsError(f"标签已存在，保留人工修改；请选择新标签包：{dest}")
         def camera_job(item):
             nonlocal completed
@@ -195,7 +195,7 @@ def generate_cameras(builder, sequence, output, *, cameras=None, profiles=None, 
                     format="json",label_status="draft",review_status="unreviewed",output=str(output),
                     automatic_estimation=estimate,elapsed_seconds=round(time.monotonic()-started,2))
         # Workers never touch the shared manifests. Publish once after joining.
-        refresh_package(output,kind="segmentation",protocol_id=builder.workspace.protocol["protocol_id"])
+        builder.finish_output(output)
         save_json(output/"last_run.json",report)
         save_json(output/("run_"+run_id+".json"),report)
         return report

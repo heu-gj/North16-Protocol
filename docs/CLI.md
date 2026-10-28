@@ -22,7 +22,31 @@ python cli.py initialize --raw E:\Dataset\north16\260902 --output E:\Dataset\nor
 
 输出必须是新目录；初始化不生成图片、不创建masks。用`--segments`指定片段，不传则发现受支持布局下的片段。
 
-## 相机抽帧与导出
+## 推荐：独立标注工作区
+
+以下命令均可将 `north16` 换成 `python cli.py` 或 `python -m north16`。初始化最终目录后，在工作区抽帧；最终目录仅在导入整包后获得图片与标签。
+
+```powershell
+north16 annotation initialize --dataset E:\data\datasets --output E:\data\annotation
+north16 annotation extract --root E:\data\annotation --interval 5 --dry-run
+north16 annotation extract --root E:\data\annotation --interval 5
+north16 annotation gui --root E:\data\annotation
+north16 annotation export --root E:\data\annotation --output E:\data\delivery
+north16 import-package --root E:\data\datasets --package E:\data\delivery
+```
+
+`annotation initialize` 也接受 `--raw <原始根>`（与 `--dataset` 二选一），以及仅用于raw的 `--segments`。extract/export 均支持 `--sequences`、`--sensor visible|infrared`、`--cameras`；extract 的间隔、FFmpeg/FFprobe和dry-run与相机模块共用实现。
+
+`segmentation generate/batch/estimate` 识别工作区角色。工作区 generate/batch 省略 `--output` 即就地保存JSON，显式指定时只允许工作区根目录。export 自动按工作区整包交付；普通datasets仍导出独立标签包。示例：
+
+```powershell
+north16 segmentation batch --root E:\data\annotation --sequence 20260902_044232 --workers 4 --profiles E:\data\profiles --no-estimate --limit 1
+north16 annotation export --root E:\data\annotation --sensor visible --cameras back_04 --output E:\data\selected_delivery
+```
+
+已有标签拒绝重算覆盖。工作区全部选中图片（含未标注帧）随标签交付；停止/失败不发布半成品交付包，原工作区保留。命令帮助：`north16 annotation --help`。详细合同见 [ANNOTATION.md](ANNOTATION.md)。
+
+## 兼容流程：相机抽帧与导出
 
 ```powershell
 python cli.py camera extract --root E:\Dataset\north16\datasets_new

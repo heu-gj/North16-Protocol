@@ -1,3 +1,7 @@
+# 0.11.0：独立标注模块
+
+新增 `annotation/` 管理独立工作区、抽帧和图片＋标签交付；`AnnotationBuilder` 复用 segmentation 就地保存JSON，GUI按工作区角色路由。相机模块维护images/meta/frames；分割模块维护masks；packages负责完整性与冲突校验。初始化不解码、不创建masks。当前推荐目录与模块职责见 [ANNOTATION.md](ANNOTATION.md)，步骤见 [WORKFLOW.md](WORKFLOW.md)。下文为仍兼容的历史数据集内抽帧/外置标签包流程。
+
 # North16 0.9.0：初始化、相机、分割
 
 所有示例也可用`python cli.py <命令>`运行，见[Python CLI](CLI.md)。本机解释器为protocol/.venv/Scripts/python.exe；包内命令与Python脚本共用实现。

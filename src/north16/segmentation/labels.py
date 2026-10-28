@@ -33,7 +33,7 @@ def render(data):
     return np.asarray(canvas)
 
 
-def validate_label(path, image, *, root, expected_id=None, rasterize=True):
+def validate_label(path, image, *, root, expected_id=None, rasterize=True, protocol_id=None):
     path,image,root=Path(path),Path(image).resolve(strict=True),Path(root).resolve(strict=True)
     data=json.loads(path.read_text(encoding="utf-8-sig"))
     metadata=data.get("north16",{})
@@ -44,7 +44,7 @@ def validate_label(path, image, *, root, expected_id=None, rasterize=True):
         raise ValueError("标注原图路径/校验值不匹配")
     if expected_id is not None and metadata.get("id")!=expected_id:
         raise ValueError("标注样本ID不匹配")
-    if metadata.get("protocol_id")!=read_info(root/"protocol.txt")["protocol_id"]:
+    if metadata.get("protocol_id")!=(protocol_id or read_info(root/"protocol.txt")["protocol_id"]):
         raise ValueError("标注协议不匹配")
     with Image.open(image) as source:
         if source.size!=(data.get("imageWidth"),data.get("imageHeight")):

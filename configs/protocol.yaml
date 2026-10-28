@@ -382,7 +382,14 @@ dataset_reader:
   source_builder_scope: single_root_explicit_segments_camera_auxiliary_preservation_only
   generic_builder_implemented: false
 annotation_workspace:
-  status: legacy_compatibility
+  status: implemented
+  default_workflow: independent_annotation_then_combined_import
+  workspace_role: annotation
+  image_layout: sequences/{sequence}/{sensor}/{camera}/images/{frame}.png
+  label_layout: sequences/{sequence}/{sensor}/{camera}/masks/{frame}.json
+  delivery_kind: annotation
+  delivery_unlabeled_images: include_selected_complete_streams
+  existing_labels: refuse_overwrite
   layout_version: annotation_workspace_v1
   drafts: annotations/drafts/{sequence}/{sensor}/{camera}/{run}
   projects: annotations/projects/{sequence}/{sensor}/{camera}/{run}

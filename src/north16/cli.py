@@ -11,10 +11,11 @@ from north16 import __version__
 
 
 COMMANDS = {
+    "annotation": ("north16.annotation.cli", "Independent image/label workspace: initialize, extract, gui, export"),
     "initialize": ("north16.layout.initialize", "Initialize structured dataset without decoding videos"),
     "camera": ("north16.camera.builder", "Extract registered camera frames or export camera packages"),
     "segmentation": ("north16.segmentation.builder", "Open annotation GUI or generate/export masks JSON packages"),
-    "import-package": ("north16.packages.storage", "Merge checked camera/segmentation packages without conflicting overwrite"),
+    "import-package": ("north16.packages.storage", "Merge checked camera/segmentation/annotation packages without conflicting overwrite"),
     "register": ("north16.registration.app", "Open visible/infrared registration workbench"),
     "annotations": ("north16.annotations.management", "Inspect annotation inventory or archive legacy experiments"),
     "gui": ("north16.gui.app", "Open the local GrabCut parameter workspace"),

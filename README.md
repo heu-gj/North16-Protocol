@@ -1,8 +1,8 @@
 # North16 Protocol
 
-海冰数据集的结构化管理、相机抽帧、可见光预标注和 Dataset 读取工具。Python 包名、导入名和命令均为 **`north16`**，当前版本 **0.10.1**，要求 **Python 3.10+**。
+海冰数据集的结构化管理、相机抽帧、可见光预标注和 Dataset 读取工具。Python 包名、导入名和命令均为 **`north16`**，当前版本 **0.11.0**，要求 **Python 3.10+**。
 
-原始视频 → 初始化结构化目录 → 相机抽帧 → 调参预览 → 首/中/末检查 → 导出 JSON 标签包 → 合并数据集 → 人工修正与审核。
+原始视频 → 初始化最终目录 → 独立标注工作区抽帧与标注 → 图片＋JSON 整包交付 → Dataset 读取与审核。
 
 ## 安装
 
@@ -29,10 +29,10 @@ python -m pip install .
 python -m pip install -e ".[gui]"
 
 # 从 GitHub 固定版本安装，无需手动克隆
-python -m pip install "north16[gui] @ git+https://github.com/heu-gj/North16-Protocol.git@v0.10.1"
+python -m pip install "north16[gui] @ git+https://github.com/heu-gj/North16-Protocol.git@v0.11.0"
 
 # 从 GitHub Releases 下载 wheel 后安装
-python -m pip install ".\north16-0.10.1-py3-none-any.whl[gui]"
+python -m pip install ".\north16-0.11.0-py3-none-any.whl[gui]"
 ```
 
 安装 wheel 后可在任意目录使用 `north16` 或 `python -m north16`，无需复制 `src/` 或配置 `PYTHONPATH`。从源码目录运行时也支持 `python cli.py ...`。这些安装方式不依赖 PyPI 发布。
@@ -51,76 +51,52 @@ python -m pip install ".\north16-0.10.1-py3-none-any.whl[gui]"
 
 ## 从视频到标签
 
-以下是 Windows 路径示例；换成自己的输入、输出路径即可。初始化输出须为新目录。
+推荐使用独立 `annotation` 工作区。最终 `datasets` 初始化时不转图片、不创建 masks；图片与标签完成后一起导入。已有初始化好的 datasets 从第2步开始。
 
 ```powershell
-# 1. 只登记视频并初始化目录，不解码、不创建 masks
+# 1. 登记原视频并初始化最终目录（新目录）
 north16 initialize --raw E:\data\raw --output E:\data\datasets
-
-# 2. 相机模块抽帧，保留原尺寸、逐帧 PTS 和来源信息
-north16 camera extract --root E:\data\datasets
-
-# 可选：每隔至少5秒保留一个实际帧；与上面的全量方式二选一
-north16 camera extract --root E:\data\datasets --interval 5
-
-# 先只读预检，不生成图片：查看处理范围、预计容量和剩余空间
-north16 camera extract --root E:\data\datasets --interval 5 --dry-run
-
-# 3. 在界面中选择片段、visible 镜头并调参
-north16 segmentation gui --root E:\data\datasets
+# 2. 创建标注工作区（新目录，不复制旧图片/标签）
+north16 annotation initialize --dataset E:\data\datasets --output E:\data\annotation
+# 3. 预检和抽帧；--interval 单位秒，省略则全量
+north16 annotation extract --root E:\data\annotation --interval 5 --dry-run
+north16 annotation extract --root E:\data\annotation --interval 5
+# 4. 调参、验证并保存同镜头 masks/*.json
+north16 annotation gui --root E:\data\annotation
+# 5. 导出图片＋标签＋逐帧元信息（新目录）
+north16 annotation export --root E:\data\annotation --output E:\data\delivery
+# 6. 校验整包导入最终数据集
+north16 import-package --root E:\data\datasets --package E:\data\delivery
 ```
 
-界面操作：
+界面选择 visible，在16路总览点击镜头独立调参，设置两点地平线（忽略半宽默认1.00%）、冰水混合/全冰/全水模式，估计并调整阈值，验证首/中/末，再勾选镜头并点击“保存勾选镜头的标签”。这些操作将 JSON 写入工作区同镜头 masks；不复制图片。
 
-1. 进入“16路总览 / 勾选导出”，点击某个镜头进行独立调试。
-2. 可选“两点直线”地平线，拖动左右端点调整高度和倾斜；也支持多点折线。忽略半宽默认图高的 1.00%。
-3. 人工选择冰水混合、全冰或全水模式；默认保留当前地平线，自动估计亮度阈值，再修调预览。各镜头参数独立。
-4. 点击“验证16路：开头 / 中间 / 末尾”，用 4×4 总览或逐镜头三帧并排检查。不生成标签、不重新估参。
-5. 勾选要导出的镜头，点击“导出勾选镜头的标签”。调参完成后保持“生成前各镜头独立自动估参”不勾选，使用当前参数处理当前片段所选镜头的全部帧。
-6. 点击“打开最近输出目录”查看标签包。默认位于数据集相邻的 `labels/<批次>/`；也可选择输出位置。其他片段分别检查、导出。
+点击“导出图片＋标签整包”交付当前片段勾选的 visible 镜头；红外浏览时交付当前镜头。CLI 可用 `--sequences`、`--sensor`、`--cameras` 筛选，不筛选则交付全部完整镜头。包内包括选中镜头的所有图片（也包括未标注帧），报告单列未标注数量。旧 datasets 的外置标签包流程仍兼容。
 
-现有自动目录发现适配 North16 采集布局；其他原始布局需要增加适配器。当前 GrabCut 预标注仅适配 **visible**，**infrared** 支持抽帧、浏览与像素查看。各设备时间戳登记不代表完成同步认证。
-
-`--interval` 单位为秒，接受正小数；省略则保存全部可解码帧。按源PTS从首帧开始，相邻保留帧至少间隔指定秒数，实际间隔取决于视频中可用帧；不生成补帧。文件名保留源解码帧号，如 `f000000.png`、`f000005.png`；元信息保留PTS、time_base、源帧号和保存序号。各路独立取样，不代表时间对齐。对已有完整流更改间隔会报冲突，请初始化另一个数据集目录。
-
-## 数据目录和导出包
-
-初始化不抽帧、不创建 `masks/`；抽帧后得到：
+## 数据目录和交付包
 
 ```text
-datasets/
-  info.txt / protocol.txt / classes.txt
-  sources.txt / samples.txt
-  sequences/<sequence>/
-    info.txt
-    visible/<camera>/
-      info.txt / frames.txt
-      images/f000000.png
-      meta/f000000.txt
-    infrared/<camera>/
-      ...
-  sync/info.txt
+annotation/                            工作区：抽帧和标注
+  info.txt / protocol.txt / classes.txt / sources.txt / samples.txt
+  sequences/<sequence>/<visible|infrared>/<camera>/
+    info.txt / frames.txt
+    images/f000000.png
+    meta/f000000.txt
+    masks/f000000.json                  标注后才出现
+  parameters/... / last_run.json / logs/...
+delivery/                              图片＋标签交付包
+  package.txt / files.txt / README.txt
+  dataset/sequences/...                同样的images/meta/masks路径
+datasets/                              最终目录
+  ...                                  初始化时仅登记和占位
+  sequences/.../images + meta + masks   整包导入后获得数据
 ```
 
-界面导出的标签包：
+JSON 关联 `../images/<frame>.png`，支持人工修正。生成结果是 draft/unreviewed，需审核后作为真值；保留人工修改，不覆盖已有不同内容的标签。类别 sky=0、water=1、ice=2、other=3，ignore=255。目录与交付合同见 [ANNOTATION.md](docs/ANNOTATION.md)，完整操作见 [WORKFLOW.md](docs/WORKFLOW.md)。
 
-```text
-labels/<batch>/
-  package.txt / files.txt / README.txt / last_run.json
-  parameters/<sequence>/visible/<camera>_<run>.json
-  dataset/sequences/<sequence>/visible/<camera>/
-    masks/f000000.json
-```
+抽帧间隔按源PTS选择实际帧，保留原尺寸、源帧号与PTS/time_base，不插帧、不代表各设备已同步；已有完整流更换间隔会拒绝覆盖，请建立新工作区。现有目录发现适配 North16 采集布局，其他布局需适配。GrabCut 仅适配 visible；infrared 支持抽帧、浏览和像素查看。
 
-标签文件统一放在 **`masks/*.json`**；标签包不重复携带原图。可整包校验导入：
-
-```powershell
-north16 import-package --root E:\data\datasets --package E:\data\labels\batch_01
-```
-
-也可将包内 `dataset/` 的内容整体合并到数据集根目录，无需逐个复制 masks。校验导入会拒绝内容不同的同名文件，保护已有标注。
-
-合并后，JSON 的 `../images/<frame>.png` 关联原图，可用 X-AnyLabeling 修正。类别为 `sky=0`、`water=1`、`ice=2`、`other=3`，不确定区域 `ignore=255`。算法输出为 **draft/unreviewed**，需人工修正与审核后作为 benchmark 真值。
+容量预检累计所选待处理流的宽×高×3×预计帧数×1.2，是RGB24未压缩保守估计，PNG实际可能更小。压缩视频较小并不代表抽帧占用小。可缩小片段/模态/镜头或增加间隔。工作区、交付包、最终数据集复制后各占一份空间，不自动删除源数据。
 
 ## Dataset 读取
 
@@ -132,6 +108,7 @@ from north16.datasets import SegmentationDataset
 dataset = SegmentationDataset(
     root=r"E:\data\datasets",
     split=None,
+    sequences=["20260902_044232"],
     sensor="visible",
     labeled_only=True,
     allowed_label_statuses=["draft"],  # 仅用于试标检查
@@ -149,7 +126,7 @@ python -m build
 python -m twine check dist/*
 ```
 
-产物为 `dist/north16-0.10.1-py3-none-any.whl` 和 `dist/north16-0.10.1.tar.gz`，包含 Python 模块、协议配置、TXT 模板和文档。原始视频、数据集、运行标签、虚拟环境和备份不打入包。
+产物为 `dist/north16-0.11.0-py3-none-any.whl` 和 `dist/north16-0.11.0.tar.gz`，包含 Python 模块、协议配置、TXT 模板和文档。原始视频、数据集、运行标签、虚拟环境和备份不打入包。
 
 ```powershell
 python -m pip install ".[all]"
@@ -163,6 +140,7 @@ GitHub Actions 提供 Windows 回归测试，以及 Ubuntu 上构建、检查和
 ```text
 src/north16/
   layout/          目录初始化与路径规范
+  annotation/      独立图片/标注工作区与完整交付
   camera/          相机抽帧、索引与导出
   segmentation/    JSON 标签生成、维护与栅格化
   packages/        数据包清单和校验合并
@@ -175,6 +153,7 @@ src/north16/
 | 文档 | 内容 |
 | --- | --- |
 | [工作流](docs/WORKFLOW.md) | 原始视频到标签的操作顺序 |
+| [标注工作区](docs/ANNOTATION.md) | 图片/标签布局、交付和兼容合同 |
 | [模块与目录](docs/MODULES.md) | 结构化目录、导出包和 Dataset |
 | [Python CLI](docs/CLI.md) | 命令和参数示例 |
 | [界面](docs/GUI.md) | 两点地平线、调参和验证 |
