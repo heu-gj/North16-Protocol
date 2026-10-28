@@ -27,11 +27,14 @@ python cli.py initialize --raw E:\Dataset\north16\260902 --output E:\Dataset\nor
 ```powershell
 python cli.py camera extract --root E:\Dataset\north16\datasets_new
 python cli.py camera extract --root E:\Dataset\north16\datasets_new --interval 5
+python cli.py camera extract --root E:\Dataset\north16\datasets_new --interval 5 --dry-run
 python cli.py camera extract --root E:\Dataset\north16\datasets_new --sensor visible --cameras back_04
 python cli.py camera export --root E:\Dataset\north16\datasets_new --output E:\Dataset\north16\camera_export
 ```
 
 全量和间隔抽帧二选一。`--interval` 单位秒、必须有限且大于0，可用0.5等小数；默认省略保存所有实际帧。按源PTS从首帧起选择，每次保留第一个与上次保留帧相差至少指定秒数的实际帧。不插帧、不保证各设备同步。图片名称和样本ID保留源解码帧序号（可能不连续）；meta记录原PTS/time_base、decoded_frame_index和saved_frame_index，info记录间隔与总解码/保存帧数。更改已有流的间隔会拒绝覆盖，应使用新初始化目录。历史build入口仍按原配置全量抽帧。
+
+`--dry-run`只读预检：核验原视频、探测视频信息，输出所选片段/模态/镜头、预计保存帧数、保守容量和磁盘剩余空间。不解码图片、不创建运行日志或锁。预算按宽×高×3×帧数×1.2计算，是RGB24未压缩估算，实际PNG可能显著更小；视频文件大小不能直接用于估算PNG。容量报错会列出预计GiB、剩余GiB和待抽帧路数；不提供无检查强制写满磁盘的开关。可先缩小片段/镜头范围或增加时间间隔。
 
 ## 分割标注与JSON导出
 

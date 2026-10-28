@@ -140,6 +140,26 @@ class SamplingTests(unittest.TestCase):
             self.assertGreaterEqual(float(rows[0]['pts_time']),2.)
             self.assertEqual([int(r['pts']) for r in rows],[r['pts'] for r in source])
 
+    def test_read_only_disk_preflight_and_actionable_capacity_error(self):
+        from types import SimpleNamespace
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);raw=raw_video(root);DatasetInitializer().initialize(raw,root/'data')
+            before={p:sha256(p) for p in (root/'data').rglob('*') if p.is_file()}
+            builder=CameraBuilder(root/'data')
+            with patch('shutil.disk_usage',return_value=SimpleNamespace(free=1)):
+                full=builder.extract(ffmpeg=FFMPEG,ffprobe=FFPROBE,dry_run=True)
+                sparse=builder.extract(ffmpeg=FFMPEG,ffprobe=FFPROBE,interval=1,dry_run=True)
+                self.assertFalse(full['disk_sufficient_conservative'])
+                self.assertFalse(full['decoding_performed'])
+                self.assertEqual(full['streams'],1)
+                self.assertEqual(full['budget_bytes'],int(64*48*3*8*1.2))
+                self.assertLess(sparse['budget_bytes'],full['budget_bytes'])
+                with self.assertRaisesRegex(ValueError,r'GiB.*GiB.*--dry-run'):
+                    builder.extract(ffmpeg=FFMPEG,ffprobe=FFPROBE)
+            self.assertEqual(before,{p:sha256(p) for p in (root/'data').rglob('*') if p.is_file()})
+            self.assertFalse((root/'data/.north16_build.lock').exists())
+            self.assertFalse(list((root/'data').rglob('*.png')))
+
     def test_ambiguous_missing_or_backwards_pts_logs_are_rejected(self):
         base='[showinfo@source @ x] config in time_base: 1/10\n[showinfo@selected @ y] config in time_base: 1/10\n'
         def frame(role,n,pts):return f'[showinfo@{role} @ x] n: {n} pts: {pts} pts_time:{pts}\n'

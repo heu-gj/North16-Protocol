@@ -30,7 +30,7 @@ class CameraBuilder:
         self.info = info
         self.sources = read_table(local_path(self.root,info.get("source_registry","sources.txt")))
 
-    def extract(self, *, sequences=None, sensor=None, cameras=None, ffmpeg="ffmpeg", ffprobe="ffprobe", interval=None):
+    def extract(self, *, sequences=None, sensor=None, cameras=None, ffmpeg="ffmpeg", ffprobe="ffprobe", interval=None, dry_run=False):
         interval = normalize_interval(interval)
         if self.info.get("camera_index") != "frames":
             raise ValueError("旧数据集保留原build复现入口；新抽帧请先initialize，旧数据集仍可camera export")
@@ -52,6 +52,7 @@ class CameraBuilder:
         # Validate all sources/stream placeholders and capacity before decoding.
         pending = []
         budget = 0
+        stream_details = []
         for row in sources:
             path = Path(row["source_absolute_path"]).resolve(strict=True)
             if sha256(path) != row["sha256"]:
@@ -65,13 +66,36 @@ class CameraBuilder:
             if current.get("decode_status") != "pending":
                 verify_stream(folder, key=key, source_id=asset.source_id)
             stream = probe(path, ffprobe)
+            count = (estimated_count(stream, interval) if current.get("decode_status") == "pending"
+                     else int(current["decoded_frame_count"]))
+            stream_budget = 0
             if current.get("decode_status") == "pending":
-                count = estimated_count(stream, interval)
-                budget += int(stream["width"])*int(stream["height"])*3*count*1.2
+                stream_budget = int(stream["width"])*int(stream["height"])*3*count*1.2
+                budget += stream_budget
+            stream_details.append(dict(sequence=asset.sequence, sensor=asset.sensor, camera=asset.camera,
+                                       width=int(stream["width"]), height=int(stream["height"]),
+                                       estimated_images=count, state=current.get("decode_status"),
+                                       budget_bytes=int(stream_budget)))
             pending.append((row, asset, stream))
         import shutil
-        if shutil.disk_usage(self.root).free < budget:
-            raise ValueError("抽帧磁盘容量不足")
+        free = shutil.disk_usage(self.root).free
+        if dry_run:
+            return dict(status="preflight", decoding_performed=False, root=str(self.root),
+                        streams=len(pending), sequences=sorted({a.sequence for _, a, _ in pending}),
+                        sensors=sorted({a.sensor for _, a, _ in pending}),
+                        interval_seconds=interval, frame_selection=conversion["frame_selection"],
+                        budget_method="rgb24_uncompressed_plus_20_percent",
+                        budget_bytes=int(budget), free_bytes=free,
+                        budget_gib=round(budget/2**30, 3), free_gib=round(free/2**30, 3),
+                        disk_sufficient_conservative=free >= budget, stream_details=stream_details)
+        if free < budget:
+            pending_streams = sum(r["state"] == "pending" for r in stream_details)
+            raise ValueError(
+                f"抽帧磁盘容量不足（保守预估）：需 {budget/2**30:.2f} GiB，"
+                f"输出磁盘剩余 {free/2**30:.2f} GiB；选择 {len(pending)} 路视频，"
+                f"其中 {pending_streams} 路待抽帧。预估按 RGB24 未压缩字节数 × 1.2，"
+                "实际 PNG 可能更小。加 --dry-run 查看明细；可用 --sequences / --sensor / "
+                "--cameras 缩小范围，或在新初始化目录使用 --interval 5 稀疏抽帧。")
         lock = self.root/".north16_build.lock"
         with lock.open("x", encoding="utf-8") as handle:
             handle.write("camera extract\n")
@@ -125,13 +149,15 @@ def main(argv=None):
     parser.add_argument("--ffmpeg", default="ffmpeg")
     parser.add_argument("--ffprobe", default="ffprobe")
     parser.add_argument("--interval", type=float, help="Minimum seconds between saved frames; omit to save all frames (e.g. 5)")
+    parser.add_argument("--dry-run", action="store_true", help="Read-only preflight: show selected streams, conservative disk budget and free space without extracting")
     args = parser.parse_args(argv)
     builder = CameraBuilder(args.root)
     selection = dict(sequences=args.sequences, sensor=args.sensor, cameras=args.cameras)
     if args.action == "extract":
-        report = builder.extract(**selection, ffmpeg=args.ffmpeg, ffprobe=args.ffprobe, interval=args.interval)
+        report = builder.extract(**selection, ffmpeg=args.ffmpeg, ffprobe=args.ffprobe, interval=args.interval, dry_run=args.dry_run)
     else:
         if args.interval is not None:parser.error("--interval only applies to extract")
+        if args.dry_run:parser.error("--dry-run only applies to extract")
         if not args.output:parser.error("export requires --output")
         report = builder.export(args.output, **selection)
     print(json.dumps(report, ensure_ascii=False, indent=2))

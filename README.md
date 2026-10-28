@@ -1,6 +1,6 @@
 # North16 Protocol
 
-海冰数据集的结构化管理、相机抽帧、可见光预标注和 Dataset 读取工具。Python 包名、导入名和命令均为 **`north16`**，当前版本 **0.10.0**，要求 **Python 3.10+**。
+海冰数据集的结构化管理、相机抽帧、可见光预标注和 Dataset 读取工具。Python 包名、导入名和命令均为 **`north16`**，当前版本 **0.10.1**，要求 **Python 3.10+**。
 
 原始视频 → 初始化结构化目录 → 相机抽帧 → 调参预览 → 首/中/末检查 → 导出 JSON 标签包 → 合并数据集 → 人工修正与审核。
 
@@ -29,10 +29,10 @@ python -m pip install .
 python -m pip install -e ".[gui]"
 
 # 从 GitHub 固定版本安装，无需手动克隆
-python -m pip install "north16[gui] @ git+https://github.com/heu-gj/North16-Protocol.git@v0.10.0"
+python -m pip install "north16[gui] @ git+https://github.com/heu-gj/North16-Protocol.git@v0.10.1"
 
 # 从 GitHub Releases 下载 wheel 后安装
-python -m pip install ".\north16-0.10.0-py3-none-any.whl[gui]"
+python -m pip install ".\north16-0.10.1-py3-none-any.whl[gui]"
 ```
 
 安装 wheel 后可在任意目录使用 `north16` 或 `python -m north16`，无需复制 `src/` 或配置 `PYTHONPATH`。从源码目录运行时也支持 `python cli.py ...`。这些安装方式不依赖 PyPI 发布。
@@ -62,6 +62,9 @@ north16 camera extract --root E:\data\datasets
 
 # 可选：每隔至少5秒保留一个实际帧；与上面的全量方式二选一
 north16 camera extract --root E:\data\datasets --interval 5
+
+# 先只读预检，不生成图片：查看处理范围、预计容量和剩余空间
+north16 camera extract --root E:\data\datasets --interval 5 --dry-run
 
 # 3. 在界面中选择片段、visible 镜头并调参
 north16 segmentation gui --root E:\data\datasets
@@ -146,7 +149,7 @@ python -m build
 python -m twine check dist/*
 ```
 
-产物为 `dist/north16-0.10.0-py3-none-any.whl` 和 `dist/north16-0.10.0.tar.gz`，包含 Python 模块、协议配置、TXT 模板和文档。原始视频、数据集、运行标签、虚拟环境和备份不打入包。
+产物为 `dist/north16-0.10.1-py3-none-any.whl` 和 `dist/north16-0.10.1.tar.gz`，包含 Python 模块、协议配置、TXT 模板和文档。原始视频、数据集、运行标签、虚拟环境和备份不打入包。
 
 ```powershell
 python -m pip install ".[all]"

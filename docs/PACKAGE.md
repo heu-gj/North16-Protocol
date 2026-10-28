@@ -1,6 +1,6 @@
 # Python 包安装与发布
 
-分发名、导入名、命令均为 `north16`，当前版本 0.10.0，Python >=3.10。仓库名为 North16-Protocol。包版本与 benchmark 协议版本分别管理。
+分发名、导入名、命令均为 `north16`，当前版本 0.10.1，Python >=3.10。仓库名为 North16-Protocol。包版本与 benchmark 协议版本分别管理。
 
 ## 安装
 
@@ -17,13 +17,13 @@ python -m pip install -e ".[gui]"
 无需克隆的固定版本安装：
 
 ```powershell
-python -m pip install "north16[gui] @ git+https://github.com/heu-gj/North16-Protocol.git@v0.10.0"
+python -m pip install "north16[gui] @ git+https://github.com/heu-gj/North16-Protocol.git@v0.10.1"
 ```
 
 从 [GitHub Releases](https://github.com/heu-gj/North16-Protocol/releases) 下载 wheel 后：
 
 ```powershell
-python -m pip install ".\north16-0.10.0-py3-none-any.whl[gui]"
+python -m pip install ".\north16-0.10.1-py3-none-any.whl[gui]"
 north16 --version
 north16 doctor
 north16 segmentation gui --root E:\data\datasets
@@ -45,8 +45,8 @@ python -m twine check dist/*
 
 ```text
 dist/
-  north16-0.10.0-py3-none-any.whl
-  north16-0.10.0.tar.gz
+  north16-0.10.1-py3-none-any.whl
+  north16-0.10.1.tar.gz
 ```
 
 包内包含协议配置、模板、文档及文档示意图；不包含原始视频、数据集、标签输出、缓存、虚拟环境、备份或权重。`py3-none-any` 表示包自身为纯 Python；OpenCV、Qt、PyTorch 依赖仍需对应平台支持。
@@ -65,9 +65,9 @@ python -m unittest discover -s tests -v
 更新 `pyproject.toml`、`src/north16/__init__.py`、安装示例及变更记录中的版本后，先运行测试和构建检查。然后提交代码，推送对应版本标签，例如：
 
 ```powershell
-git tag -a v0.10.0 -m "North16 0.10.0"
+git tag -a v0.10.1 -m "North16 0.10.1"
 git push origin main
-git push origin v0.10.0
+git push origin v0.10.1
 ```
 
 `.github/workflows/release.yml` 先执行测试及安装验证，通过后才创建 GitHub Release 并上传 wheel、sdist 和 `SHA256SUMS.txt`。版本标签必须匹配 Python 包版本。源码不提交 dist 构建目录；安装包从 Releases 下载。
