@@ -746,7 +746,7 @@ class Window(QMainWindow):
         if self.current_path is None:
             self.error("请先打开一张图片");return
         from north16.annotations.estimation import estimate_parameters
-        from north16.annotations.grabcut import digest
+        from north16.common.files import file_state as digest
         from north16.annotations.profiles import validate_profile
         path = self.current_path
         try:
@@ -771,7 +771,7 @@ class Window(QMainWindow):
                 failure = None
             except ValueError as exc:
                 mask, failure = None, str(exc)
-            if digest(path) != report["source_image_sha256"]:
+            if digest(path) != report["source_image_state"]:
                 raise ValueError("预览期间原图发生变化，请重新加载")
             report.update(preview_status="failed" if failure else "succeeded", preview_error=failure)
             return None if cancel.is_set() else (suggested, report, mask, failure)
@@ -837,7 +837,7 @@ class Window(QMainWindow):
         paths = [self.images[i] for i in sorted({0, len(self.images)//2, len(self.images)-1})]
         key = profile_hash(profile)
         def compute(cancel, progress):
-            from north16.annotations.grabcut import digest
+            from north16.common.files import file_state as digest
             from PIL import ImageDraw, ImageFont
             font_path = Path("C:/Windows/Fonts/msyh.ttc")
             font = ImageFont.truetype(str(font_path), 15) if font_path.exists() else ImageFont.load_default()
@@ -845,8 +845,8 @@ class Window(QMainWindow):
             for i, path in enumerate(paths):
                 if cancel.is_set():
                     return None
-                image = read_image(path)
                 checksum = digest(path)
+                image = read_image(path)
                 mask = preview(path, profile)
                 if digest(path) != checksum:
                     raise ValueError("验证期间原图发生变化")
@@ -857,7 +857,7 @@ class Window(QMainWindow):
                     row.paste(picture, (col*320+(316-picture.width)//2, 26+(250-picture.height)//2))
                 draw.text((8, 5), f"{i+1}: {path.name}", fill="#193c5c", font=font)
                 sheets.append(row)
-                receipts.append(dict(image=str(path), image_sha256=checksum,
+                receipts.append(dict(image=str(path), image_state=checksum,
                                      mask_sha256=__import__('hashlib').sha256(mask.tobytes()).hexdigest()))
                 progress(i+1, len(paths), path.name)
             sheet = Image.new("RGB", (960, 290*len(sheets)), "white")
@@ -904,7 +904,7 @@ class Window(QMainWindow):
         def complete(report):
             for record in report["cameras"]:
                 key=(sequence,"visible",record["camera"])
-                receipts=[dict(image=r["image"],image_sha256=r["source_image_sha256"],mask_sha256=r["mask_sha256"])
+                receipts=[dict(image=r["image"],image_state=r["source_image_state"],mask_sha256=r["mask_sha256"])
                           for r in record["unique_results"] if r["status"]=="succeeded"]
                 # A partial check cannot be recorded as completed three-frame validation.
                 if len(receipts)==record["unique_expected"]:
@@ -1099,8 +1099,8 @@ class Window(QMainWindow):
         if not self.dataset_workspace or not self.stream_key or self.stream_key[1]!="visible":return
         if self.overview_scope!=(str(self.dataset_workspace.root),self.stream_key[0]):return
         from north16.gui.overview_jobs import preview_result
-        from north16.common.files import sha256
-        result=preview_result(path,self.source,mask,profile,sha256(path))
+        from north16.common.files import file_state
+        result=preview_result(path,self.source,mask,profile,file_state(path))
         result["camera"]=self.stream_key[2]
         result["requested_frame_index"]=self.overview.frame_index.value()
         self.camera_previews[self.stream_key[2]]=result
@@ -1111,10 +1111,10 @@ class Window(QMainWindow):
         if self.overview_scope!=(str(self.dataset_workspace.root),self.stream_key[0]):return
         result=self.camera_previews.get(self.stream_key[2])
         if not result or str(self.current_path)!=result["image"]:return
-        from north16.common.files import sha256
+        from north16.common.files import file_state
         try:
             if profile_hash(self.current_profile())!=result["profile_sha256"]:return
-            if sha256(self.current_path)!=result["source_image_sha256"]:return
+            if file_state(self.current_path)!=result["source_image_state"]:return
         except (ValueError,OSError):return
         self.mask=result["mask"]
         self.result_key=(str(self.current_path),result["profile_sha256"])

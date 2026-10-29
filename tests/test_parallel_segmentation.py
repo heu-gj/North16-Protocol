@@ -58,6 +58,7 @@ class ParallelTests(unittest.TestCase):
                 pixels=np.array(Image.open(image)).astype(int)
                 Image.fromarray(np.clip(pixels+40,0,255).astype(np.uint8)).save(image)
                 row["image_sha256"]=sha256(image)
+                row["image_bytes"]=image.stat().st_size
             write_table(stream/"frames.txt",rows[0].keys(),rows)
             before={p:sha256(p) for p in data.rglob("*") if p.is_file()}
             builder=SegmentationBuilder(data);p=profiles(builder)

@@ -7,7 +7,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from north16.annotations.grabcut import digest
+from north16.common.files import file_state
 from north16.annotations.profiles import DEFAULT_PROFILE, profile_hash, validate_profile
 from north16.annotations.workspace import read_image
 
@@ -147,7 +147,7 @@ def estimate_parameters(path, base=None, *, keep_horizon=False):
     """Return suggested parameters and traceable diagnostics without writing files."""
     path = Path(path).resolve(strict=True)
     base = validate_profile(base or DEFAULT_PROFILE)
-    before = digest(path)
+    before = file_state(path)
     image = read_image(path)
     if min(image.size) < 64 or not .25 <= image.width/image.height <= 4:
         raise ValueError("自动估计适用于至少64×64、宽高比在1:4到4:1之间的相机图像")
@@ -177,9 +177,9 @@ def estimate_parameters(path, base=None, *, keep_horizon=False):
         warnings.append(brightness["reason"])
         warnings.append("未可靠分出两组亮度；请检查是否为全冰或全水，必要时人工选择海面模式，不应强行二分")
     profile = validate_profile(profile)
-    if digest(path) != before:
+    if file_state(path) != before:
         raise ValueError("估计期间原图发生变化，请重新加载")
-    report = dict(method=METHOD, source_image=str(path), source_image_sha256=before,
+    report = dict(method=METHOD, source_image=str(path), source_image_state=before, file_checksum="none",
                   native_size_wh=list(image.size), profile_sha256=profile_hash(profile),
                   base_profile_sha256=profile_hash(base), sea_mode=profile["sea_mode"], horizon=horizon, brightness=brightness,
                   warnings=warnings, review_status="unreviewed",

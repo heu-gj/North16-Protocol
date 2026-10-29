@@ -18,6 +18,36 @@ def sha256(path: Path) -> str:
     return h.hexdigest()
 
 
+def file_state(path: Path) -> str:
+    """Cheap, transient change detection; this is NOT a content checksum."""
+    stat = Path(path).stat()
+    if not Path(path).is_file():
+        raise ValueError(f"Not a regular file: {path}")
+    return f"{stat.st_size}:{stat.st_mtime_ns}:{stat.st_ctime_ns}"
+
+
+def check_size(path: Path, expected=None) -> int:
+    """Check availability and an optional byte count, including legacy receipts."""
+    file_state(path)
+    size = Path(path).stat().st_size
+    if expected not in (None, "", "unknown", "disabled") and size != int(expected):
+        raise ValueError(f"File size mismatch / 文件大小校验失败: {path}")
+    return size
+
+
+def same_content(left: Path, right: Path) -> bool:
+    """Compare only a destination conflict, without SHA or cached comparison."""
+    if check_size(left) != check_size(right):
+        return False
+    with Path(left).open("rb") as a, Path(right).open("rb") as b:
+        while True:
+            block = a.read(1024 * 1024)
+            if block != b.read(1024 * 1024):
+                return False
+            if not block:
+                return True
+
+
 def atomic_bytes(path: Path, data: bytes, *, durable: bool = True) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(path.name + ".tmp_" + uuid.uuid4().hex)

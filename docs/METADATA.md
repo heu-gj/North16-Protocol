@@ -97,7 +97,9 @@ annotation 工程位于 annotations/projects/；修订资产存 annotations/hist
 
 ## 已实现的相机帧回执
 
-每个相机目录 frames.txt 为带表头 TSV：id、image、meta、image_sha256、image_bytes、pts、pts_time、time_base。它登记不可变的源解码身份和图像完整性；人工条件与标签仍以 meta 为依据，不覆盖回执。image/meta 是相对数据集根的完整路径。image_bytes 为非负字节数，pts_time 是解码器输出的相对时间，不能解释成 UTC。回执和相机 info 验收后提交，用于断点恢复。
+每个相机目录 frames.txt 为带表头 TSV：id、image、meta、image_sha256、image_bytes、pts、pts_time、time_base。它登记源解码身份和图片大小；人工条件与标签仍以 meta 为依据，不覆盖回执。image/meta 是相对数据集根的完整路径。image_bytes 为非负字节数，pts_time 是解码器输出的相对时间，不能解释成 UTC。回执和相机 info 验收后提交，用于断点恢复。
+
+0.14.0推荐模块流程取消文件SHA：sources.txt新增modified_ns；sha256及frames的image_sha256仅为兼容旧列，新增记录填disabled。根info的file_checksum=none，新JSON记录image_bytes。旧SHA字段不再参与模块校验；大小/文件系统时间戳只检查一般变化，不提供内容完整性证明。files.txt的新清单为path、size_bytes，导入兼容旧path、sha256清单。以上替代本章早期历史实现中的文件哈希要求；旧build/pilot保留历史合同。
 
 每次运行 decoder/ 下保留各 source_id 的 FFmpeg 命令 JSON 与完整 stderr 日志，probes.json 保留原始 stream 字段（含色彩标记缺失），environment.json 保留依赖及实际项目代码哈希。后验 validation.json 明确全量/抽查范围，preview.jpg 仅用于检查，不作为像素标签。
 

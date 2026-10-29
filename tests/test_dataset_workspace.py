@@ -39,7 +39,7 @@ def fixture(root):
                 pixels=np.clip(pixels.astype(int)+np.random.default_rng(i).integers(-6,7,pixels.shape),0,255).astype(np.uint8)
                 image=root/row['image'];image.parent.mkdir(parents=True,exist_ok=True);Image.fromarray(pixels).save(image)
                 write_info(root/row['meta'],dict(id=row['id'],image=row['image']))
-                frames.append(dict(id=row['id'],image=row['image'],meta=row['meta'],image_sha256=sha256(image)))
+                frames.append(dict(id=row['id'],image=row['image'],meta=row['meta'],image_sha256=sha256(image),image_bytes=image.stat().st_size))
                 rows.append(row)
             write_table(root/stream/'frames.txt',frames[0].keys(),frames)
     write_table(root/'samples.txt',SAMPLE_COLUMNS,rows)
@@ -60,7 +60,7 @@ def add_infrared(root, *, infrared_only=False):
         Image.new('L',(256,144),137).save(image)
         write_info(root/item['meta'],dict(id=item['id'],image=item['image']))
         stream=image.parent.parent
-        frames.setdefault(stream,[]).append(dict(id=item['id'],image=item['image'],meta=item['meta'],image_sha256=sha256(image)))
+        frames.setdefault(stream,[]).append(dict(id=item['id'],image=item['image'],meta=item['meta'],image_sha256=sha256(image),image_bytes=image.stat().st_size))
         infrared.append(item)
     for stream,records in frames.items():write_table(stream/'frames.txt',records[0].keys(),records)
     write_table(root/'samples.txt',SAMPLE_COLUMNS,infrared if infrared_only else rows+infrared)

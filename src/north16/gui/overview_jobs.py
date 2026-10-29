@@ -8,14 +8,14 @@ from PIL import Image
 
 from north16.annotations.profiles import profile_hash
 from north16.annotations.workspace import colored,preview,read_image
-from north16.common.files import sha256
+from north16.common.files import file_state
 from north16.segmentation.batch import camera_inputs
 
 
 def preview_result(image,source,mask,profile,checksum):
     source=source.copy();source.thumbnail((480,270))
     color=colored(mask);color=color.resize(source.size,Image.Resampling.NEAREST)
-    return dict(image=str(image),image_name=image.name,source_image_sha256=checksum,
+    return dict(image=str(image),image_name=image.name,source_image_state=checksum,
                 profile_sha256=profile_hash(profile),mask=mask,
                 source=source,color=color,overlay=Image.blend(source,color,.42))
 
@@ -24,8 +24,8 @@ def _preview_image(builder,item,image):
     prepared=builder._prepare(item["key"],[image],item["profile"])
     source=read_image(image)
     mask=preview(image,item["profile"],internal_threads=1)
-    checksum=prepared["observations"][str(image)]["image_sha256"]
-    if sha256(image)!=checksum:raise ValueError("原图预览期间发生变化")
+    checksum=prepared["observations"][str(image)]["image_state"]
+    if file_state(image)!=checksum:raise ValueError("原图预览期间发生变化")
     return preview_result(image,source,mask,item["profile"],checksum)
 
 

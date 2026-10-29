@@ -16,7 +16,7 @@ from north16.resources import resource_root
 from .paths import stream_path
 
 SOURCE_COLUMNS = ("source_id", "raw_root_id", "source_namespace", "session_id", "source_relative_path",
-                  "source_absolute_path", "sha256", "size_bytes", "sequence", "sensor", "camera", "state")
+                  "source_absolute_path", "sha256", "size_bytes", "sequence", "sensor", "camera", "state", "modified_ns")
 
 
 class DatasetInitializer:
@@ -37,8 +37,8 @@ class DatasetInitializer:
             raise ValueError("未发现受支持片段，或指定片段重复；其他布局需增加adapter")
         resources = resource_root()
         adapter = yaml.safe_load(resources.joinpath("configs/adapters/north16_capture_v1.yaml").read_text(encoding="utf-8"))
-        # Byte checksums are provenance, not frame decoding or media probing.
-        assets = discover(raw, list(segments), adapter, namespace, session)
+        # Register metadata only: do not read all raw bytes to compute checksums.
+        assets = discover(raw, list(segments), adapter, namespace, session, checksum=False)
         output.parent.mkdir(parents=True, exist_ok=True)
         with tempfile.TemporaryDirectory(prefix="north16_init_", dir=output.parent) as temp:
             stage = Path(temp) / "dataset"
@@ -49,14 +49,14 @@ class DatasetInitializer:
             info.update(record_status="recorded", dataset_id=namespace, dataset_status="working",
                         dataset_version="working", camera_index="frames", camera_status="initialized",
                         source_registry="sources.txt", sample_count=0, converter_version=__version__,
-                        reader_version=__version__, annotation_status="unlabeled")
+                        reader_version=__version__, annotation_status="unlabeled", file_checksum="none")
             write_info(stage/"info.txt", info)
             sources = []
             for a in assets:
                 sources.append(dict(source_id=a.source_id, raw_root_id=raw.name, source_namespace=namespace,
                                     session_id=session, source_relative_path=a.relative, source_absolute_path=str(a.path),
                                     sha256=a.digest, size_bytes=a.size, sequence=a.sequence, sensor=a.sensor,
-                                    camera=a.camera, state="registered"))
+                                    camera=a.camera, state="registered", modified_ns=a.modified_ns))
                 sequence_info = stage/"sequences"/a.sequence/"info.txt"
                 if not sequence_info.exists():
                     values = read_info(resources.joinpath("templates/txt/sequence_info.txt"))
@@ -69,7 +69,7 @@ class DatasetInitializer:
                     (folder/"images").mkdir(parents=True)
                     (folder/"meta").mkdir()
                     write_info(folder/"info.txt", dict(schema_version="north16_camera_v1", source_id=a.source_id,
-                               source_sha256=a.digest, source_video_path=a.relative, sequence=a.sequence,
+                               source_sha256=a.digest, source_bytes=a.size, source_video_path=a.relative, sequence=a.sequence,
                                sensor=a.sensor, camera=a.camera, decode_status="pending", decoded_frame_count=0))
             write_table(stage/"sources.txt", SOURCE_COLUMNS, sources)
             write_table(stage/"samples.txt", SAMPLE_COLUMNS, [])

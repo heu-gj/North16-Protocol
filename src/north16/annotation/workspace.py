@@ -65,7 +65,7 @@ class AnnotationWorkspace:
                     stream=local_path(stage,f"sequences/{row['sequence']}/{row['sensor']}/{row['camera']}")
                     (stream/"images").mkdir(parents=True);(stream/"meta").mkdir()
                     write_info(stream/"info.txt",dict(schema_version="north16_camera_v1",source_id=row["source_id"],
-                               source_sha256=row["sha256"],source_video_path=row["source_relative_path"],
+                               source_sha256=row.get("sha256","disabled"),source_bytes=row["size_bytes"],source_video_path=row["source_relative_path"],
                                sequence=row["sequence"],sensor=row["sensor"],camera=row["camera"],
                                decode_status="pending",decoded_frame_count=0))
                 info.update(source_registry="sources.txt",sample_count=0,camera_status="initialized")
@@ -77,7 +77,7 @@ class AnnotationWorkspace:
                 (stage/"logs").mkdir()
                 stage.rename(output)
         info=read_info(output/"info.txt")
-        info.update(workspace_role="annotation",annotation_storage="in_place_masks",sample_count=0)
+        info.update(workspace_role="annotation",annotation_storage="in_place_masks",sample_count=0,file_checksum="none")
         write_info(output/"info.txt",info)
         return dict(root=str(output),workspace_role="annotation",images=0,masks=0)
 

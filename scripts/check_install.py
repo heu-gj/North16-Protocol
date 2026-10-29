@@ -5,6 +5,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import yaml
 
 import north16
 from north16.annotations.profiles import DEFAULT_PROFILE
@@ -15,6 +16,7 @@ assert north16.__version__ == importlib.metadata.version('north16')
 assert DEFAULT_PROFILE['horizon_ignore_half_height'] == .01
 assert len(DEFAULT_PROFILE['horizon_normalized_xy']) == 2
 resources = resource_root()
+assert yaml.safe_load(resources.joinpath('configs/protocol.yaml').read_text(encoding='utf-8'))['modules']['file_checksum']=='none'
 for name in ('configs/protocol.yaml', 'templates/txt/classes.txt', 'docs/GUI.md',
              'docs/WORKFLOW.md', 'docs/ANNOTATION.md', 'docs/images/gui_samples_grid_090.png',
              'docs/images/ice_only_comparison_041.jpg'):

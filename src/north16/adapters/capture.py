@@ -20,9 +20,10 @@ class Asset:
     segment: str
     sensor: str
     camera: str
+    modified_ns: int | None = None
 
 
-def discover(raw: Path, segments: list[str], adapter: dict, namespace: str, session: str) -> list[Asset]:
+def discover(raw: Path, segments: list[str], adapter: dict, namespace: str, session: str, *, checksum=True) -> list[Asset]:
     assets = []
     for segment in segments:
         if not re.fullmatch(r"\d{4}_\d{2}_\d{2}_\d{2}_\d{2}_\d{2}_data", segment):
@@ -53,8 +54,9 @@ def discover(raw: Path, segments: list[str], adapter: dict, namespace: str, sess
             relative = path.relative_to(raw).as_posix()
             identity = f"{namespace}\0{session}\0{relative}".encode()
             source_id = "src_" + hashlib.sha256(identity).hexdigest()[:24]
-            assets.append(Asset(path, relative, source_id, sha256(path), path.stat().st_size,
-                                sequence, segment, sensor, camera))
+            stat = path.stat()
+            assets.append(Asset(path, relative, source_id, sha256(path) if checksum else "disabled", stat.st_size,
+                                sequence, segment, sensor, camera, stat.st_mtime_ns))
     keys = [(a.sequence, a.sensor, a.camera) for a in assets if a.sensor in {"visible", "infrared"}]
     if len(set(keys)) != len(keys):
         raise ValueError("Camera stream name collision")

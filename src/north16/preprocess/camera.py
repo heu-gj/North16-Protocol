@@ -12,7 +12,7 @@ from fractions import Fraction
 
 from PIL import Image
 
-from north16.common.files import read_info, read_table, sha256, write_info, write_table, write_text
+from north16.common.files import read_info, read_table, sha256, check_size, write_info, write_table, write_text
 
 
 FRAME_COLUMNS = ("id", "image", "meta", "image_sha256", "image_bytes", "pts", "pts_time", "time_base")
@@ -33,7 +33,7 @@ def probe(path: Path, ffprobe: str) -> dict:
     return dict(data["streams"][0], probe_stderr=p.stderr)
 
 
-def verify_stream(folder: Path, *, key: str, source_id: str, deep: bool = True) -> list[dict]:
+def verify_stream(folder: Path, *, key: str, source_id: str, deep: bool = True, checksum: bool = False) -> list[dict]:
     info = read_info(folder / "info.txt")
     if info.get("extraction_key") != key or info.get("source_id") != source_id or info.get("decode_status") != "complete":
         raise ValueError(f"Incomplete/conflicting output; not overwritten: {folder}")
@@ -77,7 +77,8 @@ def verify_stream(folder: Path, *, key: str, source_id: str, deep: bool = True) 
             if previous_time is not None and float(timestamp-previous_time)+1e-9 < interval:
                 raise ValueError(f"Sampling interval mismatch: {image}")
             previous_time = timestamp
-        if deep and sha256(image) != row["image_sha256"]:
+        check_size(image, row.get("image_bytes"))
+        if checksum and deep and sha256(image) != row["image_sha256"]:
             raise ValueError(f"Image changed: {image}")
     return rows
 
@@ -86,11 +87,16 @@ def extract(asset, stream: dict, output: Path, run: Path, config: dict, key: str
             ffmpeg: str, template: dict, *, interval=None, progress=None) -> dict:
     from north16.camera.sampling import normalize_interval, parse_sampled_log, video_filter
     interval = normalize_interval(interval)
+    check_size(asset.path, asset.size)
+    if asset.modified_ns is not None and asset.path.stat().st_mtime_ns != asset.modified_ns:
+        raise ValueError(f"Source changed before conversion: {asset.path}")
     folder = output / "sequences" / asset.sequence / asset.sensor / asset.camera
     reserved = False
     if folder.exists():
         existing = read_info(folder / "info.txt")
-        if existing.get("source_sha256") != asset.digest:
+        if existing.get("source_id") != asset.source_id:
+            raise ValueError(f"Original source identity changed: {asset.relative}")
+        if asset.digest != "disabled" and existing.get("source_sha256") != asset.digest:
             raise ValueError(f"Original source hash changed: {asset.relative}")
         reserved = existing.get("decode_status") == "pending" and existing.get("source_id") == asset.source_id
         if reserved:
@@ -98,7 +104,7 @@ def extract(asset, stream: dict, output: Path, run: Path, config: dict, key: str
                     any((folder/name).is_symlink() or not (folder/name).is_dir() or any((folder/name).iterdir()) for name in ("images", "meta"))):
                 raise ValueError("Initialized stream contains unexpected files; not overwritten")
         else:
-            rows = verify_stream(folder, key=key, source_id=asset.source_id)
+            rows = verify_stream(folder, key=key, source_id=asset.source_id, checksum=asset.digest != "disabled")
             return {"asset": asset, "count": len(rows), "reused": True, "folder": folder,
                     "diagnostic": existing.get("diagnostic", "unknown")}
     folder.parent.mkdir(parents=True, exist_ok=True)
@@ -167,7 +173,8 @@ def extract(asset, stream: dict, output: Path, run: Path, config: dict, key: str
                 meta[f"{attr}_{suffix}"] = "unknown"
             meta[f"{attr}_status"] = "unreviewed"
             meta[f"{attr}_reason"] = "not_assessed"
-        digest = sha256(path)
+        # The legacy build command still has its explicit checksummed contract.
+        digest = sha256(path) if asset.digest != "disabled" else "disabled"
         meta["image_sha256"] = digest
         # Sidecars live inside an unpublished stream staging directory. Avoid
         # a disk-wide FlushFileBuffers for every frame; final receipts are durable.
@@ -180,7 +187,8 @@ def extract(asset, stream: dict, output: Path, run: Path, config: dict, key: str
     diagnostic = "decoder_messages_present" if warnings else "none"
     write_table(staging / "frames.txt", FRAME_COLUMNS, rows)
     write_info(staging / "info.txt", dict(schema_version="north16_camera_v1", record_status="recorded",
-               source_id=asset.source_id, source_sha256=asset.digest, source_video_path=asset.relative,
+               source_id=asset.source_id, source_sha256=asset.digest, source_bytes=asset.size, source_video_path=asset.relative,
+               file_checksum="none" if asset.digest == "disabled" else "sha256",
                raw_root_id=config["inputs"][0]["raw_root_id"], session_id=config["inputs"][0]["session_id"],
                sequence=asset.sequence, sensor=asset.sensor, camera=asset.camera,
                position=asset.camera.rsplit("_", 1)[0], lens_id=asset.path.stem,
@@ -196,7 +204,10 @@ def extract(asset, stream: dict, output: Path, run: Path, config: dict, key: str
                     source_decoded_frame_count=decoded_count, saved_frame_count=len(rows))
         write_info(staging / "info.txt", info)
     if progress:progress(dict(phase='publish'))
-    if sha256(asset.path) != asset.digest:
+    check_size(asset.path, asset.size)
+    if asset.modified_ns is not None and asset.path.stat().st_mtime_ns != asset.modified_ns:
+        raise ValueError(f"Source changed during conversion: {asset.path}")
+    if asset.digest != "disabled" and sha256(asset.path) != asset.digest:
         raise ValueError(f"Source changed during conversion: {asset.path}")
     if reserved:
         # Retain initialized metadata in the run; rollback on failed publication.

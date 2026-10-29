@@ -89,6 +89,9 @@ class ModuleTests(unittest.TestCase):
             ds=SegmentationDataset(root/'third',split=None,sequences=key[0],allowed_label_statuses=['draft'])
             self.assertEqual(int(ds[0]['mask'][2,2]),3)
             edited['north16']['image_sha256']='bad';label.write_text(json.dumps(edited),encoding='utf-8')
+            # Historical SHA declarations are ignored; byte count is still checked.
+            SegmentationDataset(root/'third',split=None,sequences=key[0],allowed_label_statuses=['draft'])
+            edited['north16']['image_bytes']=0;label.write_text(json.dumps(edited),encoding='utf-8')
             with self.assertRaisesRegex(ValueError,'校验'):
                 SegmentationDataset(root/'third',split=None,sequences=key[0],allowed_label_statuses=['draft'])
 

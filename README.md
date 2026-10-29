@@ -1,8 +1,10 @@
 # North16 Protocol
 
-海冰数据集的结构化管理、相机抽帧、可见光预标注和 Dataset 读取工具。Python 包名、导入名和命令均为 **`north16`**，当前版本 **0.13.0**，要求 **Python 3.10+**。
+海冰数据集的结构化管理、相机抽帧、可见光预标注和 Dataset 读取工具。Python 包名、导入名和命令均为 **`north16`**，当前版本 **0.14.0**，要求 **Python 3.10+**。
 
 原始视频 → 初始化最终目录 → 独立标注工作区抽帧与标注 → 图片＋JSON 整包交付 → Dataset 读取与审核。
+
+初始化、相机抽帧、GUI预标注、整包导出/导入和Dataset标签读取已取消文件SHA计算与校验。保留文件大小、样本身份、图片尺寸、标签格式检查和已有文件冲突保护；旧数据直接兼容。此调整减少磁盘重复读取，不改变PNG图片容量。详见 [标注存储合同](docs/ANNOTATION.md)。
 
 ## 安装
 
@@ -29,10 +31,10 @@ python -m pip install .
 python -m pip install -e ".[gui]"
 
 # 从 GitHub 固定版本安装，无需手动克隆
-python -m pip install "north16[gui] @ git+https://github.com/heu-gj/North16-Protocol.git@v0.13.0"
+python -m pip install "north16[gui] @ git+https://github.com/heu-gj/North16-Protocol.git@v0.14.0"
 
 # 从 GitHub Releases 下载 wheel 后安装
-python -m pip install ".\north16-0.13.0-py3-none-any.whl[gui]"
+python -m pip install ".\north16-0.14.0-py3-none-any.whl[gui]"
 ```
 
 安装 wheel 后可在任意目录使用 `north16` 或 `python -m north16`，无需复制 `src/` 或配置 `PYTHONPATH`。从源码目录运行时也支持 `python cli.py ...`。这些安装方式不依赖 PyPI 发布。
@@ -130,7 +132,7 @@ python -m build
 python -m twine check dist/*
 ```
 
-产物为 `dist/north16-0.13.0-py3-none-any.whl` 和 `dist/north16-0.13.0.tar.gz`，包含 Python 模块、协议配置、TXT 模板和文档。原始视频、数据集、运行标签、虚拟环境和备份不打入包。
+产物为 `dist/north16-0.14.0-py3-none-any.whl` 和 `dist/north16-0.14.0.tar.gz`，包含 Python 模块、协议配置、TXT 模板和文档。原始视频、数据集、运行标签、虚拟环境和备份不打入包。
 
 ```powershell
 python -m pip install ".[all]"

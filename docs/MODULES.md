@@ -16,7 +16,7 @@ north16 initialize --raw E:\Dataset\north16\260902 --output E:\Dataset\north16\d
 
 输出必须是新目录，不能覆盖现有datasets。默认发现原始根下符合`YYYY_MM_DD_HH_MM_SS_data`的片段；也可用`--segments <片段1> <片段2>`指定范围。当前适配器支持既有north16采集布局，其他布局需增加适配器，不声称任意视频布局都能自动识别。
 
-初始化只读取文件身份、大小、SHA256和目录信息，既不调用FFmpeg/ffprobe，也不复制原始视频、不生成图片或标签。大目录计算校验值仍需要时间。原视频绝对路径写入sources.txt，后续抽帧时需可访问；移动原视频后应更新来源登记并重新核验，不能盲目改source_id。
+初始化只登记文件身份、大小、修改时间和目录信息，不计算文件SHA，既不调用FFmpeg/ffprobe，也不复制原始视频、不生成图片或标签。原视频绝对路径写入sources.txt，后续抽帧时需可访问；移动原视频后应更新来源登记，不能盲目改source_id。
 
 ```text
 datasets_new/
@@ -118,7 +118,7 @@ generate用于算法预标注，export仅收集数据集masks里已有的规范J
 north16 import-package --root <datasets> --package <标签包或相机包>
 ```
 
-导入前校验包清单、哈希、目录、协议、原图身份、尺寸和已有文件冲突，内容相同跳过，不同则拒绝。相机包仅允许替换同来源pending流的info声明。复制中途IO失败可能留下已复制子集；包内文件不会被删除，修复问题后可重复导入完成。新数据集从各流frames读取相机观测，根samples是可重建汇总；旧数据集继续读原samples，但masks中的JSON标签优先，不需要重写总表。
+导入前检查包清单、大小、目录、协议、原图身份、尺寸和已有文件冲突，不计算文件SHA；同名冲突逐块比较，内容相同跳过，不同则拒绝。相机包仅允许替换同来源pending流的info声明。复制中途IO失败可能留下已复制子集；包内文件不会被删除，修复问题后可重复导入完成。新数据集从各流frames读取相机观测，根samples是可重建汇总；旧数据集继续读原samples，但masks中的JSON标签优先，不需要重写总表。
 
 ```python
 from north16.datasets import SegmentationDataset

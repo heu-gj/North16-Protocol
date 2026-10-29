@@ -1,5 +1,7 @@
 # Python CLI
 
+0.14.0的initialize、camera/annotation extract、segmentation generate/batch/export及annotation export/import-package默认不计算或验证文件SHA，无需新增参数。--dry-run保留大小、来源身份、抽帧配置和磁盘容量检查。同名目标文件仍检查实际内容冲突。旧SHA记录只保留为历史信息。
+
 在protocol目录使用`python cli.py <命令>`，与`python -m north16 <命令>`共用包内CLI，不重复实现业务逻辑。脚本根据自身位置读取src，不依赖终端当前目录。需要当前Python环境具备所用模块的依赖；本机已配置protocol/.venv。
 
 ```powershell

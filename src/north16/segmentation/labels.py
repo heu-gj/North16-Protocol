@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image, ImageDraw
 
-from north16.common.files import sha256, read_info
+from north16.common.files import check_size, read_info
 
 CLASSES = dict(sky=0, water=1, ice=2, other=3, ignore=255)
 
@@ -40,8 +40,9 @@ def validate_label(path, image, *, root, expected_id=None, rasterize=True, proto
     relative=image.relative_to(root).as_posix()
     meta_path=image.parent.parent/"meta"/(image.stem+".txt")
     if expected_id is None and meta_path.is_file():expected_id=read_info(meta_path).get("id")
-    if metadata.get("image")!=relative or metadata.get("image_sha256")!=sha256(image):
-        raise ValueError("标注原图路径/校验值不匹配")
+    if metadata.get("image")!=relative:
+        raise ValueError("标注原图路径不匹配")
+    check_size(image,metadata.get("image_bytes"))
     if expected_id is not None and metadata.get("id")!=expected_id:
         raise ValueError("标注样本ID不匹配")
     if metadata.get("protocol_id")!=(protocol_id or read_info(root/"protocol.txt")["protocol_id"]):

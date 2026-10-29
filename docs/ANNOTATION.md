@@ -52,9 +52,11 @@ data/
 
 workspace 的 info.txt 标记 `workspace_role=annotation`、`annotation_storage=in_place_masks`。普通 datasets 无此标记，维持外置标签包行为。工作区不生成嵌套 dataset/ 或 package.txt；只有交付包才有这些内容。工作区的参数和运行记录留在原处；生成参数与估参依据亦嵌入标签 north16 字段，整包交付无需依赖原工作区绝对路径。
 
-交付包 `schema_version=north16_package_v1`、`kind=annotation`、protocol_id 与数据集一致。files.txt 对 payload 中所有文件登记相对路径和SHA256，不携带最终根索引、工作区角色头或参数运行日志。导出校验完整流、实际图片哈希及已有标签，复制到临时目录，复核后发布新包；停止/失败不发布半成品。选择整个镜头的图片和meta，允许尚未标注的图片，明确报告 images/labels/unlabeled_images 数量。
+交付包 `schema_version=north16_package_v1`、`kind=annotation`、protocol_id 与数据集一致。files.txt 对 payload 中所有文件登记相对路径和size_bytes，不计算文件SHA，不携带最终根索引、工作区角色头或参数运行日志。导出检查完整流、图片大小及已有标签，复制到临时目录，核对大小和源文件状态后发布新包；停止/失败不发布半成品。选择整个镜头的图片和meta，允许尚未标注的图片，明确报告 images/labels/unlabeled_images 数量。
 
-导入先检查全包清单、哈希、原视频 source_id/source_sha256、流目录身份、帧索引与PTS、JSON尺寸/类别/样本ID/原图哈希，并预检所有目标冲突，再逐文件复制。同名同内容跳过；初始化pending流可被同来源complete流替换；其他不同内容拒绝覆盖。抽帧、就地生成、导出及导入使用根目录互斥锁，避免协议工具同时改写。外部人工编辑不持此锁，导出时请停止编辑，复制时发现变化会拒绝发布。导入异常中断后已复制文件可能保留，相同包可校验重试。
+导入先检查全包清单、文件大小、原视频source_id/相对路径/可用的原视频大小、流目录身份、帧索引与PTS、JSON尺寸/类别/样本ID/原图路径，并预检所有目标冲突，再逐文件复制。同名文件仅在冲突检查时逐块比较实际内容，不计算SHA；同内容跳过，不同内容拒绝覆盖。初始化pending流可被同来源complete流替换。抽帧、就地生成、导出及导入使用根目录互斥锁。导出/复制期间通过大小及文件系统时间戳发现一般修改；这不等于内容哈希校验，不能识别所有保持大小和时间戳的内容变化。导入异常中断后已复制文件可能保留，相同包可重试。
+
+从0.14.0起，推荐模块流程不计算或验证视频、图片、标签和交付文件的SHA。初始化只登记来源路径、大小、修改时间和稳定ID；新source/frames兼容列sha256/image_sha256填disabled，绝不写入伪造哈希。新JSON使用image_bytes、file_checksum=none。旧目录、旧JSON和旧SHA清单仍可读取，旧SHA只作为历史记录，不参与校验。参数版本及内存预览结果的短指纹仍保留，用于判断参数是否变化，不扫描原始文件。旧build/pilot、旧PNG草稿回读及配准等历史/独立工具仍保留各自的校验合同。
 
 根 samples.txt 是初始化快照，合并不覆盖它；CameraDataset/SegmentationDataset 根据 `camera_index=frames` 读取各流 frames.txt，因此整包导入即可读取，无需逐个复制masks或手动重建根索引。缺失标签可用 labeled_only=True 显式筛选；不是已审核标签。试标示例：
 

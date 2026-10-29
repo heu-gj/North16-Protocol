@@ -9,7 +9,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from north16.common.files import local_path, read_info, sha256, write_info
+from north16.common.files import local_path, read_info, check_size, file_state, write_info
 from north16.packages import refresh_package, export_files
 from north16.layout.paths import label_path
 from .labels import render, validate_label
@@ -80,10 +80,10 @@ class SegmentationBuilder:
             try:
                 mask=preview(image,profile,internal_threads=internal_threads)
                 if cancel and cancel.is_set():cancelled=True;break
-                if sha256(image)!=row["image_sha256"]:raise ValueError("原图处理期间发生变化")
+                if file_state(image)!=row["image_state"]:raise ValueError("原图处理期间发生变化")
                 data=dict(version="4.0.0",flags={},shapes=vectorize(mask),imagePath="../images/"+image.name,
                           imageData=None,imageWidth=mask.shape[1],imageHeight=mask.shape[0],checked=False,
-                          north16=dict(id=row["id"],image=row["image"],image_sha256=row["image_sha256"],
+                          north16=dict(id=row["id"],image=row["image"],image_bytes=row["image_bytes"],file_checksum="none",
                                        protocol_id=context["protocol_id"],label_status="draft",review_status="unreviewed",
                                        method=segmentation_method(profile),parameters=profile,profile_sha256=profile_hash(profile),
                                        generated_at=datetime.now(timezone.utc).isoformat()))
@@ -146,15 +146,18 @@ def generate_folder(images, profile, output, *, cancel=None, progress=None):
     for index,image in enumerate(images):
         if cancel and cancel.is_set():cancelled=True;break
         try:
+            before=file_state(image)
             mask=preview(image,profile)
             if cancel and cancel.is_set():cancelled=True;break
             stem=f"{index:06d}_{image.stem}"
             copied=output/"images"/(stem+image.suffix.lower())
             copied.parent.mkdir(exist_ok=True)
             shutil.copyfile(image,copied)
+            check_size(copied,image.stat().st_size)
+            if file_state(image)!=before:raise ValueError("原图处理期间发生变化")
             data=dict(version="4.0.0",flags={},shapes=vectorize(mask),imagePath="../images/"+copied.name,
                       imageData=None,imageWidth=mask.shape[1],imageHeight=mask.shape[0],checked=False,
-                      north16=dict(source_image=str(image),image_sha256=sha256(image),label_status="draft",parameters=profile))
+                      north16=dict(source_image=str(image),image_bytes=check_size(image),file_checksum="none",label_status="draft",parameters=profile))
             if not np.array_equal(render(data),mask):raise ValueError("JSON像素还原不一致")
             target=output/"masks"/(stem+".json");save_json(target,data);records.append(str(target))
         except Exception as exc:errors.append(dict(image=str(image),error=str(exc)))

@@ -13,7 +13,7 @@ import yaml
 
 from north16 import __version__
 from north16.adapters.capture import Asset
-from north16.common.files import local_path, read_info, read_table, sha256, write_info
+from north16.common.files import local_path, read_info, read_table, check_size, write_info
 from north16.preprocess.camera import extract, probe, verify_stream
 from north16.camera.sampling import estimated_count, normalize_interval, video_filter
 from north16.preprocess.index import build_index
@@ -48,7 +48,13 @@ class CameraBuilder:
                           fps_mode="passthrough", compression_level=3, frame_selection="all_decodable_source_frames")
         if interval is not None:
             conversion.update(filter=video_filter(interval), frame_selection="minimum_pts_interval", interval_seconds=interval, copyts=True)
-        key = hashlib.sha256(json.dumps(conversion, sort_keys=True).encode()).hexdigest()
+        # Software-only upgrades must not force existing streams to be decoded again.
+        settings = {k:v for k,v in conversion.items() if k != "version"}
+        key = hashlib.sha256(json.dumps(settings, sort_keys=True).encode()).hexdigest()
+        compatible_keys = {key} | {
+            hashlib.sha256(json.dumps(dict(conversion,version=v),sort_keys=True).encode()).hexdigest()
+            for v in ("0.6.0","0.7.0","0.8.0","0.9.0","0.9.1","0.9.2","0.9.3",
+                      "0.10.0","0.10.1","0.11.0","0.12.0","0.13.0",__version__)}
         # Validate all sources/stream placeholders and capacity before decoding.
         pending = []
         budget = 0
@@ -57,16 +63,22 @@ class CameraBuilder:
             if progress:progress(dict(phase='preflight',stream_index=index,streams=len(sources),
                                      sequence=row['sequence'],sensor=row['sensor'],camera=row['camera']))
             path = Path(row["source_absolute_path"]).resolve(strict=True)
-            if sha256(path) != row["sha256"]:
-                raise ValueError(f"原视频校验失败：{path}")
-            asset = Asset(path, row["source_relative_path"], row["source_id"], row["sha256"], int(row["size_bytes"]),
-                          row["sequence"], row["source_relative_path"].split("/")[0], row["sensor"], row["camera"])
+            check_size(path, row["size_bytes"])
+            modified = path.stat().st_mtime_ns
+            recorded = row.get("modified_ns")
+            if recorded not in (None, "unknown", "") and modified != int(recorded):
+                raise ValueError(f"原视频修改时间已变化：{path}")
+            asset = Asset(path, row["source_relative_path"], row["source_id"], "disabled", int(row["size_bytes"]),
+                          row["sequence"], row["source_relative_path"].split("/")[0], row["sensor"], row["camera"], modified)
             folder = self.root/stream_path(asset.sequence,asset.sensor,asset.camera)
             current = read_info(folder/"info.txt")
             if current["source_id"] != asset.source_id:
                 raise ValueError("相机目录来源冲突")
+            stream_key=key
             if current.get("decode_status") != "pending":
-                verify_stream(folder, key=key, source_id=asset.source_id)
+                if current.get("extraction_key") in compatible_keys:
+                    stream_key=current["extraction_key"]
+                verify_stream(folder, key=stream_key, source_id=asset.source_id)
             stream = probe(path, ffprobe)
             count = (estimated_count(stream, interval) if current.get("decode_status") == "pending"
                      else int(current["decoded_frame_count"]))
@@ -78,13 +90,13 @@ class CameraBuilder:
                                        width=int(stream["width"]), height=int(stream["height"]),
                                        estimated_images=count, state=current.get("decode_status"),
                                        budget_bytes=int(stream_budget)))
-            pending.append((row, asset, stream))
+            pending.append((row, asset, stream, stream_key))
         import shutil
         free = shutil.disk_usage(self.root).free
         if dry_run:
             return dict(status="preflight", decoding_performed=False, root=str(self.root),
-                        streams=len(pending), sequences=sorted({a.sequence for _, a, _ in pending}),
-                        sensors=sorted({a.sensor for _, a, _ in pending}),
+                        streams=len(pending), sequences=sorted({a.sequence for _, a, _, _ in pending}),
+                        sensors=sorted({a.sensor for _, a, _, _ in pending}),
                         interval_seconds=interval, frame_selection=conversion["frame_selection"],
                         budget_method="rgb24_uncompressed_plus_20_percent",
                         budget_bytes=int(budget), free_bytes=free,
@@ -105,7 +117,7 @@ class CameraBuilder:
         results = []
         try:
             run.mkdir(parents=True)
-            for index,(row, asset, stream) in enumerate(pending,1):
+            for index,(row, asset, stream, stream_key) in enumerate(pending,1):
                 context=dict(stream_index=index,streams=len(pending),sequence=asset.sequence,sensor=asset.sensor,camera=asset.camera)
                 def update(event):
                     if progress:progress(dict(context,**event))
@@ -118,13 +130,13 @@ class CameraBuilder:
                     def decode_progress(event):
                         if event['phase']=='decode':event=dict(event,total=estimated)
                         update(event)
-                result=extract(asset, stream, self.root, run, config, key, ffmpeg,
+                result=extract(asset, stream, self.root, run, config, stream_key, ffmpeg,
                                read_info(resources.joinpath("templates/txt/frame.txt")), interval=interval,progress=decode_progress)
                 results.append(result)
                 update(dict(phase='stream_done',images=result['count'],reused=result['reused']))
             rows = build_index(self.root, protocol)
             info = read_info(self.root/"info.txt")
-            info.update(sample_count=len(rows), camera_status="partially_or_fully_extracted", latest_camera_run=run.relative_to(self.root).as_posix())
+            info.update(sample_count=len(rows), camera_status="partially_or_fully_extracted", file_checksum="none",latest_camera_run=run.relative_to(self.root).as_posix())
             write_info(self.root/"info.txt", info)
             report = dict(status="succeeded", streams=len(results), images=sum(r["count"] for r in results),
                           reused_streams=sum(r["reused"] for r in results), budget_bytes=int(budget),

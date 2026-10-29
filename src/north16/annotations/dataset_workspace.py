@@ -9,7 +9,7 @@ import uuid
 
 import yaml
 
-from north16.common.files import local_path, read_info, read_table, sha256
+from north16.common.files import local_path, read_info, read_table, check_size, file_state
 from north16.preprocess.index import SAMPLE_COLUMNS
 from north16.resources import resource_root
 
@@ -44,7 +44,7 @@ class DatasetWorkspace:
             raise ValueError("不支持此标注输出状态或命名规则")
         self.streams = defaultdict(list)
         seen, seen_paths = set(), set()
-        self.snapshots = {name: sha256(self.root / name) for name in ("samples.txt", "protocol.txt", "classes.txt", "info.txt")}
+        self.snapshots = {name: file_state(self.root / name) for name in ("samples.txt", "protocol.txt", "classes.txt", "info.txt")}
         from north16.camera.index import camera_rows
         for row in camera_rows(self.root):
             if not set(SAMPLE_COLUMNS).issubset(row) or not all(row[k] for k in ("id", "sequence", "sensor", "camera", "image", "meta")):
@@ -73,7 +73,7 @@ class DatasetWorkspace:
         self.assert_unchanged()
 
     def assert_unchanged(self):
-        if any(sha256(self.root / name) != value for name, value in self.snapshots.items()):
+        if any(file_state(self.root / name) != value for name, value in self.snapshots.items()):
             raise ValueError("数据集索引或协议已变化，请重新打开数据集后再生成")
 
     def keys(self, sensor="visible"):
@@ -121,12 +121,11 @@ class DatasetWorkspace:
             if (frame.get("image") != row["image"] or frame.get("meta") != row["meta"] or
                     meta.get("id") != row["id"] or meta.get("image") != row["image"]):
                 raise ValueError(f"帧回执/元信息身份不一致：{image.name}")
-            if sha256(image) != frame.get("image_sha256"):
-                raise ValueError(f"原图与构建回执不一致：{image.name}")
-            observations[str(image)] = dict(row, image_sha256=frame["image_sha256"])
+            size=check_size(image,frame.get("image_bytes"))
+            observations[str(image)] = dict(row, image_sha256="disabled", image_bytes=size, image_state=file_state(image))
         context = dict(dataset_root=str(self.root), protocol_id=self.protocol["protocol_id"],
                        sequence=seq, sensor=sensor, camera=camera, input_snapshots=self.snapshots,
-                       frames_sha256=sha256(receipt_path), output_policy=dict(self.policy))
+                       frames_state=file_state(receipt_path), file_checksum="none", output_policy=dict(self.policy))
         return observations, context
 
 

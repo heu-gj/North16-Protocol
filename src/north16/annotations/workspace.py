@@ -104,7 +104,7 @@ def run_job(images, profile, output, *, cancel=None, progress=None, estimation=N
             stem = path.stem if observation is not None else f"{index:06d}_{path.stem}"
             try:
                 before = digest(path)
-                if observation is not None and before != observation["image_sha256"]:
+                if observation is not None and observation.get("image_sha256") not in (None,"disabled") and before != observation["image_sha256"]:
                     raise ValueError("原图与数据集构建回执不一致")
                 mask = preview(path, profile)
                 if mask.dtype != np.uint8 or mask.ndim != 2 or not set(np.unique(mask)).issubset(PALETTE):

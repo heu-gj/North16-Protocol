@@ -11,6 +11,7 @@ modules:
   package_payload: dataset
   index_for_new_datasets: per_stream_frames
   empty_masks_on_initialization_or_extraction: false
+  file_checksum: none
 name: North16
 design_version: design-v0.7
 build_spec: ../docs/BUILD.md
@@ -42,7 +43,7 @@ extraction:
   ffmpeg_build: null
   overwrite: false
   atomic_commit: true
-  checksum: sha256
+  checksum: none
   enhancement: none
   preserve_original_geotiff: true
   memory_and_disk_estimate_required: true
